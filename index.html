@@ -1,0 +1,2475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>变电站变压器高精度3D交互仿真与油色谱智能诊断系统</title>
+<style>
+:root{
+  --bg:#050b18; --panel:#081226f2; --panel2:#0a1a33; --line:#1c3a5e; --line2:#2b5a8a;
+  --txt:#cfe3f7; --dim:#6f8db0; --cyan:#22d3ee; --blue:#3b82f6; --green:#22e584;
+  --amber:#fbbf24; --red:#f4504f; --glow:0 0 12px #22d3ee33;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);
+  font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;color:var(--txt);
+  font-size:13px;user-select:none}
+#canvas-wrap{position:absolute;inset:0}
+canvas{display:block}
+
+/* ===== 顶部标题栏 ===== */
+#topbar{position:absolute;top:0;left:0;right:0;height:52px;z-index:20;
+  background:linear-gradient(180deg,#0a1a33f5,#081226d8);
+  border-bottom:1px solid var(--line2);display:flex;align-items:center;
+  padding:0 16px;box-shadow:0 2px 18px #000a;overflow:hidden}
+/* 标题栏底部扫描光带 */
+#topbar::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;
+  background:linear-gradient(90deg,transparent,#22d3ee 20%,#7dd3fc 50%,#22d3ee 80%,transparent);
+  filter:drop-shadow(0 0 6px #22d3ee);opacity:.85;animation:scanline 5s linear infinite}
+@keyframes scanline{0%{transform:scaleX(.25)}50%{transform:scaleX(1)}100%{transform:scaleX(.25)}}
+/* 标题栏背景网格纹理 */
+#topbar::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.10;
+  background-image:linear-gradient(#22d3ee55 1px,transparent 1px),linear-gradient(90deg,#22d3ee55 1px,transparent 1px);
+  background-size:26px 26px;mask-image:linear-gradient(180deg,transparent,#000 60%)}
+#topbar .menu{width:30px;height:30px;border:1px solid var(--line2);
+  display:flex;align-items:center;justify-content:center;color:var(--cyan);cursor:pointer;font-size:15px;
+  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);
+  background:linear-gradient(135deg,#0e2242cc,#06101f);box-shadow:inset 0 0 10px #22d3ee22;transition:.15s}
+#topbar .menu:hover{box-shadow:inset 0 0 14px #22d3ee55,0 0 10px #22d3ee44}
+#topbar h1{flex:1;text-align:center;font-size:20px;letter-spacing:6px;font-weight:600;position:relative;
+  background:linear-gradient(90deg,#7dd3fc,#22d3ee 35%,#e0faff 50%,#22d3ee 65%,#7dd3fc);
+  background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:0 0 24px #22d3ee55;animation:titleflow 6s linear infinite}
+@keyframes titleflow{to{background-position:-200% 0}}
+/* 系统名称两侧科幻装饰翼 */
+#topbar h1 .wing{display:inline-block;vertical-align:middle;width:64px;height:14px;margin:0 14px;
+  background:
+   linear-gradient(90deg,transparent,var(--cyan)) right 0 top 6px/46px 1px no-repeat,
+   linear-gradient(90deg,transparent,#22d3ee88) right 0 top 2px/30px 1px no-repeat,
+   linear-gradient(90deg,transparent,#22d3ee66) right 0 top 10px/30px 1px no-repeat;
+  position:relative}
+#topbar h1 .wing::after{content:"";position:absolute;top:3px;width:7px;height:7px;
+  border:1px solid var(--cyan);transform:rotate(45deg);box-shadow:0 0 8px #22d3ee88}
+#topbar h1 .wing.l::after{right:52px}
+#topbar h1 .wing.r{transform:scaleX(-1)}
+#topbar h1 .wing.r::after{right:52px}
+#topbar .right{font-family:Consolas,monospace;font-size:12px;color:var(--dim);text-align:right;line-height:1.5}
+#topbar .right b{color:var(--cyan);font-weight:normal}
+#topbar .src-badge{display:inline-block;border:1px solid var(--line2);border-radius:4px;
+  padding:1px 8px;color:var(--green);margin-left:6px}
+
+/* ===== 顶部工具条 ===== */
+#toolbar{position:absolute;top:60px;left:286px;right:308px;z-index:15;
+  display:flex;gap:4px;justify-content:center;flex-wrap:wrap;
+  background:linear-gradient(180deg,#0a1a33ee,#071223e6);border:1px solid #2b5a8a88;
+  padding:5px 8px;box-shadow:0 0 16px #22d3ee22,inset 0 0 24px #22d3ee0d;
+  clip-path:polygon(12px 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,12px 100%,0 50%)}
+.tbtn{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:52px;
+  padding:5px 8px;border-radius:6px;cursor:pointer;color:var(--dim);font-size:11px;
+  border:1px solid transparent;transition:.15s}
+.tbtn .ico{font-size:16px;line-height:1}
+.tbtn{border:1px solid transparent;clip-path:polygon(5px 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%,0 5px)}
+.tbtn:hover{color:var(--txt);background:#0e2242}
+.tbtn.on{color:var(--cyan);border-color:#22d3ee77;background:linear-gradient(180deg,#12305e,#0a1a33);
+  box-shadow:0 0 10px #22d3ee44,inset 0 0 8px #22d3ee33}
+
+/* ===== 侧边面板通用 ===== */
+.side{position:absolute;top:60px;bottom:12px;width:268px;z-index:14;display:flex;
+  flex-direction:column;gap:8px;overflow-y:auto;overflow-x:hidden;padding-bottom:4px}
+.side::-webkit-scrollbar{width:5px}.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+#left{left:10px}#right{right:10px;width:292px}
+/* 科幻切角卡片 */
+.card{position:relative;flex-shrink:0;background:linear-gradient(160deg,#0b1c38f2,#060e1ff2);
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
+  box-shadow:0 0 18px #22d3ee14}
+/* 卡片描边层（clip-path 下 border 会裁掉，用内阴影 + 四角亮斑替代） */
+.card::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:2;
+  box-shadow:inset 0 0 0 1px #2b5a8a66,inset 0 0 26px #22d3ee0a}
+/* 四角能量光斑 */
+.card::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:2;
+  background:
+   linear-gradient(135deg,var(--cyan) 0,transparent 42%) left 0 top 0/14px 2px no-repeat,
+   linear-gradient(225deg,var(--cyan) 0,transparent 42%) left 0 top 0/2px 14px no-repeat,
+   linear-gradient(315deg,#22d3eeaa 0,transparent 42%) right 0 top 0/16px 2px no-repeat,
+   linear-gradient(45deg,#22d3eeaa 0,transparent 42%) right 0 top 0/2px 16px no-repeat,
+   linear-gradient(45deg,var(--cyan) 0,transparent 42%) right 0 bottom 0/14px 2px no-repeat,
+   linear-gradient(315deg,var(--cyan) 0,transparent 42%) right 0 bottom 0/2px 14px no-repeat,
+   linear-gradient(225deg,#22d3eeaa 0,transparent 42%) left 0 bottom 0/16px 2px no-repeat,
+   linear-gradient(135deg,#22d3eeaa 0,transparent 42%) left 0 bottom 0/2px 16px no-repeat}
+.card>h3{position:relative;font-size:12.5px;color:var(--cyan);letter-spacing:3px;padding:9px 14px 8px;
+  display:flex;align-items:center;gap:8px;text-shadow:0 0 10px #22d3ee66;
+  background:linear-gradient(90deg,#22d3ee14,transparent 55%)}
+/* 标题下能量分隔线 */
+.card>h3::after{content:"";position:absolute;left:14px;right:10px;bottom:0;height:1px;
+  background:linear-gradient(90deg,var(--cyan),#2b5a8a55 40%,transparent 85%)}
+/* 标题左侧菱形符标 */
+.card>h3::before{content:"";width:8px;height:8px;transform:rotate(45deg);flex-shrink:0;
+  border:1.5px solid var(--cyan);box-shadow:0 0 8px #22d3eeaa,inset 0 0 4px #22d3ee66}
+.card .bd{padding:8px 12px}
+
+.kv{display:flex;justify-content:space-between;align-items:center;padding:3.5px 0;
+  border-bottom:1px dashed #12233d;font-size:12px}
+.kv:last-child{border-bottom:none}
+.kv .k{color:var(--dim)}
+.kv .v{font-family:Consolas,monospace;color:var(--txt)}
+.v.g{color:var(--green)}.v.a{color:var(--amber)}.v.r{color:var(--red)}
+
+/* 工况场景 */
+select,input[type=number]{background:linear-gradient(180deg,#0b1c38,#06101f);
+  border:1px solid #2b5a8a88;color:var(--txt);padding:4px 8px;font-size:12px;outline:none;width:100%;
+  clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
+select:focus{border-color:var(--cyan)}
+select option{background:#0a1a33}
+.mini-slider{display:flex;align-items:center;gap:8px;margin:7px 0;font-size:12px}
+.mini-slider label{flex:0 0 76px;color:var(--dim)}
+.mini-slider input[type=range]{flex:1;accent-color:var(--cyan);height:3px}
+.mini-slider .val{flex:0 0 48px;text-align:right;font-family:Consolas,monospace;color:var(--cyan)}
+
+/* 保护装置状态灯 */
+.prot{display:flex;justify-content:space-between;align-items:center;padding:3.5px 0;font-size:12px}
+.prot .dot{width:9px;height:9px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 8px var(--green);display:inline-block;margin-left:8px}
+.prot .dot.red{background:var(--red);box-shadow:0 0 8px var(--red);animation:blink .7s infinite alternate}
+.prot .dot.amber{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.prot .st{color:var(--dim);font-size:11px;margin-left:auto}
+.prot .st.act{color:var(--cyan)}
+@keyframes blink{to{opacity:.35}}
+
+/* 告警条 */
+#alarm-bar .bd{max-height:88px;overflow-y:auto}
+.alm{font-size:11.5px;padding:3px 0;color:var(--green)}
+.alm.warn{color:var(--amber)}.alm.err{color:var(--red)}
+.alm .t{color:var(--dim);font-family:Consolas,monospace;margin-right:6px}
+
+/* ===== 右侧：剖切控制 / DGA ===== */
+.switch{position:relative;width:34px;height:18px;background:#12233d;border-radius:9px;cursor:pointer;transition:.2s}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+  background:#5b7a9d;transition:.2s}
+.switch.on{background:#0e3a52}
+.switch.on::after{left:18px;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+.clip-row{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:12px}
+.clip-row label{flex:0 0 76px;color:var(--dim)}
+.clip-row input{flex:1;accent-color:var(--cyan)}
+.clip-row .val{flex:0 0 40px;text-align:right;font-family:Consolas,monospace;color:var(--cyan)}
+
+.gas-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
+.gas-table td{padding:2.5px 4px;border-bottom:1px dashed #12233d}
+.gas-table td:first-child{color:var(--dim);width:52%}
+.gas-table input{width:82px;text-align:right;font-family:Consolas,monospace;padding:2px 6px}
+.gas-table input.zero{border-color:var(--amber)}
+.ratio-table{width:100%;border-collapse:collapse;font-size:12px}
+.ratio-table td{padding:3px 4px;border-bottom:1px dashed #12233d;font-family:Consolas,monospace}
+.ratio-table td:first-child{color:var(--dim);font-family:inherit}
+#code-digits{font-family:Consolas,monospace;font-size:30px;color:var(--green);letter-spacing:10px;
+  text-align:center;padding:6px 0 2px;text-shadow:0 0 16px #22e58466}
+#code-digits.na{color:var(--amber);text-shadow:0 0 16px #fbbf2466}
+#diag-conclusion{font-size:12.5px;line-height:1.7;padding:8px;border-radius:6px;
+  background:#06101f;border:1px solid var(--line);white-space:pre-wrap;min-height:64px}
+#diag-conclusion .big{font-size:15px;font-weight:bold}
+#diag-conclusion.ok .big{color:var(--green)}
+#diag-conclusion.warn .big{color:var(--amber)}
+#diag-conclusion.err .big{color:var(--red)}
+#duval-cv{width:100%;height:190px;background:#06101f;border-radius:6px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:10.5px;color:var(--dim);margin-top:5px}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:3px}
+
+.dsrc-row{display:flex;gap:6px;align-items:center;margin:6px 0}
+.abtn{flex:1;background:#0e2242;border:1px solid var(--line2);color:var(--txt);border-radius:6px;
+  padding:6px 4px;font-size:12px;cursor:pointer;transition:.15s;text-align:center}
+.abtn:hover{border-color:var(--cyan);color:var(--cyan);box-shadow:var(--glow)}
+.abtn.primary{background:#0c2f4a;color:var(--cyan)}
+#ext-status{font-size:11px;color:var(--amber)}
+
+/* ===== 底部控制区 ===== */
+#bottombar{position:absolute;left:270px;right:300px;bottom:12px;z-index:14;display:flex;gap:8px}
+.bcard{flex:1;position:relative;padding:8px 14px;
+  background:linear-gradient(160deg,#0b1c38f2,#060e1ff2);
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
+  box-shadow:0 0 16px #22d3ee14}
+.bcard::before{content:"";position:absolute;inset:0;pointer-events:none;
+  box-shadow:inset 0 0 0 1px #2b5a8a66,inset 0 0 22px #22d3ee0a;
+  background:linear-gradient(90deg,var(--cyan),transparent 30%) left 0 top 0/120px 2px no-repeat}
+.bcard h4{font-size:11.5px;color:var(--cyan);letter-spacing:2px;margin-bottom:6px;text-shadow:0 0 8px #22d3ee66}
+.bcard h4::before{content:"";display:inline-block;width:6px;height:6px;transform:rotate(45deg);
+  border:1.5px solid var(--cyan);box-shadow:0 0 6px #22d3ee88;margin-right:7px;vertical-align:0}
+.tap-ctl{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:12px}
+.tap-ctl label{flex:0 0 118px;color:var(--dim)}
+.tap-btn{width:26px;height:24px;border:1px solid #22d3ee66;background:linear-gradient(180deg,#12305e,#081226);
+  color:var(--cyan);cursor:pointer;font-size:14px;line-height:1;
+  clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px)}
+.tap-btn:hover{box-shadow:var(--glow)}
+.tap-val{flex:1;text-align:center;font-family:Consolas,monospace;font-size:16px;color:var(--green)}
+.time-ctl{display:flex;align-items:center;gap:8px;font-size:12px}
+.time-ctl input[type=range]{flex:1;accent-color:var(--cyan)}
+.time-btns{display:flex;gap:8px;justify-content:center;margin-top:6px}
+.time-btns span{width:34px;height:26px;border:1px solid #2b5a8a88;
+  clip-path:polygon(5px 0,100% 0,100% calc(100% - 5px),calc(100% - 5px) 100%,0 100%,0 5px);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--dim);font-size:12px}
+.time-btns span:hover{color:var(--cyan);box-shadow:var(--glow)}
+.time-btns span.on{color:var(--cyan);border-color:var(--cyan);background:#12305e;
+  box-shadow:0 0 8px #22d3ee44,inset 0 0 6px #22d3ee33}
+#curve-cv{width:100%;height:86px;background:#06101f;border-radius:6px}
+
+/* ===== 悬浮信息卡 ===== */
+#tooltip{position:absolute;pointer-events:none;min-width:260px;max-width:340px;z-index:50;
+  background:linear-gradient(160deg,#0b1c38f8,#060e1ff8);border:1px solid #22d3eeaa;
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
+  padding:10px 13px;font-size:12px;display:none;box-shadow:0 0 24px #22d3ee44,inset 0 0 20px #22d3ee11;line-height:1.65}
+#tooltip .tt-name{font-size:14px;font-weight:bold;color:var(--cyan)}
+#tooltip .tt-en{color:var(--dim);font-size:11px;margin-bottom:5px}
+#tooltip .tt-row b{color:#7dd3fc;font-weight:normal}
+#tooltip .tt-state{color:var(--green);font-family:Consolas,monospace}
+#tooltip .tt-fault{color:var(--red);font-weight:bold}
+#tooltip .tt-std{color:var(--dim);font-size:10.5px;margin-top:4px;border-top:1px dashed var(--line);padding-top:4px}
+
+#toast{position:absolute;top:64px;left:50%;transform:translateX(-50%);z-index:99;
+  background:linear-gradient(180deg,#12305e,#0a1a33);border:1px solid var(--cyan);color:var(--cyan);
+  padding:7px 24px;font-size:13px;display:none;letter-spacing:2px;
+  clip-path:polygon(12px 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,12px 100%,0 50%);
+  box-shadow:0 0 16px #22d3ee55;text-shadow:0 0 8px #22d3ee88}
+#help{position:absolute;left:46px;top:0;height:52px;display:flex;align-items:center;
+  z-index:21;font-size:10.5px;color:#3d5a7d;pointer-events:none;max-width:380px}
+
+/* 面板整体隐藏模式（☰ 菜单切换） */
+body.ui-hidden .side, body.ui-hidden #toolbar, body.ui-hidden #bottombar{display:none}
+
+@media(max-width:1280px){
+  .side{width:232px}#right{width:262px}
+  #toolbar{left:250px;right:278px}
+  #bottombar{left:240px;right:270px}
+  #topbar h1{font-size:16px}
+}
+@media(max-width:1000px){
+  .side{width:200px}#right{width:230px}
+  #toolbar{left:214px;right:244px}
+  #bottombar{left:210px;right:238px}
+  #topbar h1{font-size:13px;letter-spacing:2px}
+  #help{display:none}
+}
+</style>
+</head>
+<body>
+<div id="canvas-wrap"></div>
+
+<!-- 顶部标题栏 -->
+<div id="topbar">
+  <div class="menu" id="menu-toggle" title="隐藏/显示全部面板">☰</div>
+  <h1><span class="wing l"></span>变电站变压器高精度3D交互仿真与油色谱智能诊断系统<span class="wing r"></span></h1>
+  <div class="right">
+    <span id="clock">--</span><br>
+    数据源：<span class="src-badge" id="src-badge">模拟数据</span>
+  </div>
+</div>
+
+<!-- 顶部工具条 -->
+<div id="toolbar">
+  <div class="tbtn on" data-t="select"><span class="ico">➤</span>选择</div>
+  <div class="tbtn" data-t="clip"><span class="ico">◧</span>剖视</div>
+  <div class="tbtn" data-t="explode"><span class="ico">✦</span>爆炸</div>
+  <div class="tbtn" data-t="reset"><span class="ico">⟲</span>复位</div>
+  <div class="tbtn" data-t="top"><span class="ico">⊕</span>俯视</div>
+  <div class="tbtn" data-t="side"><span class="ico">▭</span>侧视</div>
+  <div class="tbtn" data-t="section"><span class="ico">◫</span>剖面</div>
+  <div class="tbtn" data-t="inner"><span class="ico">◉</span>内部</div>
+  <div class="tbtn" data-t="free"><span class="ico">✥</span>自由视角</div>
+</div>
+
+<!-- ============ 左侧面板 ============ -->
+<div class="side" id="left">
+  <div class="card"><h3>模型规格（TBEA 产品族）</h3><div class="bd">
+    <select id="model-sel">
+      <option value="110" selected>110kV · SSZ-100000/110 · 100MVA</option>
+      <option value="220">220kV · SFSZ-240000/220 · 240MVA</option>
+      <option value="500">500kV · SF-180000/500 · 180MVA</option>
+    </select>
+    <div id="model-info" style="margin-top:6px"></div>
+  </div></div>
+
+  <div class="card"><h3>运行工况场景</h3><div class="bd">
+    <select id="scenario">
+      <option value="routine" selected>日常常规运行（60%，效率与寿命兼顾）</option>
+      <option value="light">轻载/空载运行（&lt;30%，损耗占比高）</option>
+      <option value="rated">额定负载运行（100%）</option>
+      <option value="overload">短时过载运行（130%，受温度限时）</option>
+      <option value="overheat">内部过热故障</option>
+      <option value="discharge">内部放电故障</option>
+    </select>
+    <div style="margin-top:8px;border-top:1px dashed #12233d;padding-top:4px">
+      <div class="mini-slider"><label>输入电压</label>
+        <input type="range" id="in-volt" min="95" max="125" value="110"><span class="val" id="in-volt-v">110kV</span></div>
+      <div class="mini-slider"><label>负载率</label>
+        <input type="range" id="load" min="0" max="130" value="60"><span class="val" id="load-v">60%</span></div>
+      <div class="mini-slider"><label>环境温度</label>
+        <input type="range" id="amb" min="-10" max="45" value="25"><span class="val" id="amb-v">25℃</span></div>
+    </div>
+  </div></div>
+
+  <div class="card"><h3>电气参数</h3><div class="bd">
+    <div class="kv"><span class="k">输入电压 Uin (kV)</span><span class="v" id="s-uin">--</span></div>
+    <div class="kv"><span class="k">输出电压 Uout (kV)</span><span class="v" id="s-uout">--</span></div>
+    <div class="kv"><span class="k">输入电流 Iin (A)</span><span class="v" id="s-iin">--</span></div>
+    <div class="kv"><span class="k">输出电流 Iout (A)</span><span class="v" id="s-iout">--</span></div>
+    <div class="kv"><span class="k">频率 f (Hz)</span><span class="v" id="s-freq">50.00</span></div>
+    <div class="kv"><span class="k">负载率 β (%)</span><span class="v" id="s-beta">--</span></div>
+  </div></div>
+
+  <div class="card"><h3>热力学参数</h3><div class="bd">
+    <div class="kv"><span class="k">♨ 绕组温度 (℃)</span><span class="v" id="s-twind">--</span></div>
+    <div class="kv"><span class="k">♨ 顶层油温 (℃)</span><span class="v" id="s-ttop">--</span></div>
+    <div class="kv"><span class="k">♨ 油温升 (K)</span><span class="v" id="s-trise">--</span></div>
+    <div class="kv"><span class="k">❄ 环境温度 (℃)</span><span class="v" id="s-tamb">--</span></div>
+    <div class="kv"><span class="k">▤ 油位 (mm)</span><span class="v" id="s-oilmm">--</span></div>
+  </div></div>
+
+  <div class="card"><h3>保护装置状态</h3><div class="bd" id="prot-list">
+    <div class="prot" data-p="gas1"><span>瓦斯继电器（轻瓦斯）</span><span class="st">正常</span><span class="dot"></span></div>
+    <div class="prot" data-p="gas2"><span>瓦斯继电器（重瓦斯）</span><span class="st">正常</span><span class="dot"></span></div>
+    <div class="prot" data-p="prv"><span>压力释放阀</span><span class="st">正常</span><span class="dot"></span></div>
+    <div class="prot" data-p="oil"><span>油位计</span><span class="st">正常</span><span class="dot"></span></div>
+    <div class="prot" data-p="fan"><span>冷却风扇</span><span class="st">停止</span><span class="dot"></span></div>
+    <div class="prot" data-p="pump"><span>油泵</span><span class="st">正常</span><span class="dot"></span></div>
+    <div class="prot" data-p="flow"><span>油流继电器</span><span class="st">正常</span><span class="dot"></span></div>
+    <div class="prot" data-p="walarm"><span>绕组温度报警</span><span class="st">正常</span><span class="dot"></span></div>
+    <div class="prot" data-p="talarm"><span>超温报警</span><span class="st">正常</span><span class="dot"></span></div>
+  </div></div>
+
+  <div class="card" id="alarm-bar"><h3>系统告警信息</h3><div class="bd" id="alarm-list">
+    <div class="alm">暂无告警</div>
+  </div></div>
+</div>
+
+<!-- ============ 右侧面板 ============ -->
+<div class="side" id="right">
+  <div class="card"><h3>剖切控制</h3><div class="bd">
+    <div class="clip-row"><label>剖切开关</label><div class="switch" id="clip-sw"></div></div>
+    <div class="clip-row"><label>剖切位置 X:</label>
+      <input type="range" id="clip-x" min="0" max="3.2" step="0.05" value="0"><span class="val" id="clip-x-v">0.00</span></div>
+    <div class="clip-row"><label>剖切位置 Y:</label>
+      <input type="range" id="clip-y" min="0" max="7" step="0.05" value="0"><span class="val" id="clip-y-v">0.00</span></div>
+    <div class="clip-row"><label>剖切位置 Z:</label>
+      <input type="range" id="clip-z" min="0" max="2" step="0.05" value="0"><span class="val" id="clip-z-v">0.20</span></div>
+  </div></div>
+
+  <div class="card"><h3>油色谱分析（DGA）</h3><div class="bd">
+    <div class="dsrc-row"><label style="color:var(--dim);font-size:12px;flex:0 0 60px">预设样本:</label>
+      <select id="dga-preset">
+        <option value="normal">正常运行 → 编码000</option>
+        <option value="lowheat">低温过热 → 编码020</option>
+        <option value="highheat">高温过热 → 编码022</option>
+        <option value="hidis">电弧放电 → 编码200</option>
+        <option value="mix">低能放电兼过热 → 编码112</option>
+      </select></div>
+    <table class="gas-table" id="gas-table"></table>
+    <div style="font-size:11px;color:var(--dim);margin:6px 0 2px">三比值计算（DL/T 722-2014）</div>
+    <table class="ratio-table">
+      <tr><td>R1 (C₂H₂/C₂H₄)</td><td id="r1-v">--</td></tr>
+      <tr><td>R2 (CH₄/H₂)</td><td id="r2-v">--</td></tr>
+      <tr><td>R3 (C₂H₄/C₂H₆)</td><td id="r3-v">--</td></tr>
+    </table>
+    <div style="font-size:11px;color:var(--dim);margin-top:6px">编码结果（R1,R2,R3）</div>
+    <div id="code-digits">-, -, -</div>
+    <div style="font-size:11px;color:var(--dim);margin-top:4px">诊断结论</div>
+    <div id="diag-conclusion" class="ok"><span class="big">待诊断</span>
+输入气体浓度后自动分析，或选择预设样本。</div>
+  </div></div>
+
+  <div class="card"><h3>Duval 三角形（备用诊断）</h3><div class="bd">
+    <canvas id="duval-cv"></canvas>
+    <div class="legend">
+      <span><i style="background:#a855f7"></i>D1:局部放电</span>
+      <span><i style="background:#3b82f6"></i>D2:低能放电</span>
+      <span><i style="background:#ef4444"></i>DT:过热</span>
+      <span><i style="background:#ec4899"></i>T1:低温过热</span>
+      <span><i style="background:#f59e0b"></i>T2:高温过热</span>
+      <span><i style="background:#84cc16"></i>T3:&gt;700℃过热</span>
+      <span><i style="background:#64748b"></i>PD:电晕放电</span>
+    </div>
+  </div></div>
+
+  <div class="card"><h3>数据源管理</h3><div class="bd">
+    <div class="dsrc-row"><label style="color:var(--dim);font-size:12px;flex:0 0 72px">当前数据源:</label>
+      <select id="dsrc-sel"><option value="sim">模拟数据</option><option value="ext">外部接入</option></select></div>
+    <div class="dsrc-row"><label style="color:var(--dim);font-size:12px;flex:0 0 84px">外部接入状态:</label>
+      <span id="ext-status">未启用</span></div>
+    <div class="dsrc-row">
+      <button class="abtn primary" onclick="document.getElementById('csv-file').click()">导入CSV</button>
+      <button class="abtn primary" onclick="document.getElementById('json-file').click()">导入JSON</button>
+    </div>
+    <input type="file" id="csv-file" accept=".csv" style="display:none">
+    <input type="file" id="json-file" accept=".json" style="display:none">
+  </div></div>
+</div>
+
+<!-- ============ 底部控制区 ============ -->
+<div id="bottombar">
+  <div class="bcard"><h4>分接开关控制</h4>
+    <div class="tap-ctl"><label>有载分接开关档位</label>
+      <button class="tap-btn" id="tap-dec">−</button><span class="tap-val" id="tap-val">5</span>
+      <button class="tap-btn" id="tap-inc">＋</button></div>
+    <div class="tap-ctl"><label>无载分接开关档位</label>
+      <button class="tap-btn" id="ntap-dec">−</button><span class="tap-val" id="ntap-val">2</span>
+      <button class="tap-btn" id="ntap-inc">＋</button></div>
+  </div>
+  <div class="bcard"><h4>仿真时间控制</h4>
+    <div class="time-ctl"><span style="color:var(--dim)">时间尺度:</span>
+      <span class="val" id="tspeed-v" style="color:var(--cyan);font-family:Consolas">1.0x</span>
+      <input type="range" id="tspeed" min="0.1" max="10" step="0.1" value="1"></div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--dim)">
+      <span>0.1x</span><span>1x</span><span>10x</span></div>
+    <div class="time-btns">
+      <span id="tb-play" class="on">▶</span><span id="tb-pause">⏸</span>
+      <span id="tb-ff">⏭</span><span id="tb-reset">⟲</span>
+    </div>
+  </div>
+  <div class="bcard" style="flex:1.4"><h4>实时曲线（实时更新）</h4>
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+      <select id="curve-sel" style="width:130px;padding:2px 6px;font-size:11px">
+        <option value="tTop">顶层油温 (℃)</option>
+        <option value="tWind">绕组温度 (℃)</option>
+        <option value="load">负载率 (%)</option>
+        <option value="v2">输出电压 (kV)</option>
+      </select>
+    </div>
+    <canvas id="curve-cv"></canvas>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+<div id="toast"></div>
+<div id="help">🖱 左键旋转 ｜ 滚轮缩放 ｜ 右键平移 ｜ 悬浮零件查看信息</div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+"three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+// ---------- 渲染器与场景 ----------
+const wrap = document.getElementById('canvas-wrap');
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.localClippingEnabled = true;           // 剖视需要
+wrap.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x10151c);
+scene.fog = new THREE.Fog(0x10151c, 60, 160);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.05, 500);
+camera.position.set(14, 9, 16);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.maxDistance = 80; controls.minDistance = 1.5;
+controls.target.set(0, 4.2, 0);
+controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }; // 移动端手势
+
+// ---------- 灯光（影棚式三点布光 + 环境） ----------
+scene.add(new THREE.AmbientLight(0x8899bb, 0.55));
+const key = new THREE.DirectionalLight(0xffffff, 2.2);
+key.position.set(18, 26, 14); key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.left=-20; key.shadow.camera.right=20;
+key.shadow.camera.top=20; key.shadow.camera.bottom=-20;
+scene.add(key);
+const fill = new THREE.DirectionalLight(0x88aaff, 0.8); fill.position.set(-14, 10, -10); scene.add(fill);
+const rim  = new THREE.DirectionalLight(0xffddaa, 0.7); rim.position.set(0, 12, -20); scene.add(rim);
+
+// ---------- 地面（简洁变电站场景） ----------
+{
+  const g = new THREE.Mesh(
+    new THREE.CircleGeometry(80, 64),
+    new THREE.MeshStandardMaterial({ color:0x1a2027, roughness:0.95 }));
+  g.rotation.x = -Math.PI/2; g.receiveShadow = true; scene.add(g);
+  const grid2 = new THREE.GridHelper(60, 60, 0x2a3440, 0x222a33);
+  grid2.position.y = 0.01; scene.add(grid2);
+  // 混凝土基础
+  const base = new THREE.Mesh(new THREE.BoxGeometry(14, 0.5, 9),
+    new THREE.MeshStandardMaterial({ color:0x3a4048, roughness:0.9 }));
+  base.position.y = 0.25; base.receiveShadow = true; base.castShadow = true; scene.add(base);
+  // （按批注：移除周围构架立柱，仅保留变压器本体与混凝土底座）
+}
+
+// ---------- PBR 材质库 ----------
+const M = {
+  core:   new THREE.MeshStandardMaterial({ color:0x4a4e55, metalness:0.9, roughness:0.35 }),          // 铁芯:深灰拉丝
+  copper: new THREE.MeshStandardMaterial({ color:0xc87f3d, metalness:1.0, roughness:0.22 }),          // 绕组:亮铜
+  copper2:new THREE.MeshStandardMaterial({ color:0xa8682c, metalness:1.0, roughness:0.3 }),
+  paper:  new THREE.MeshStandardMaterial({ color:0xd8c9a3, metalness:0.0, roughness:0.92 }),          // 绝缘纸板:磨砂米黄
+  press:  new THREE.MeshStandardMaterial({ color:0xc4b58c, metalness:0.0, roughness:0.95 }),
+  tank:   new THREE.MeshStandardMaterial({ color:0x1f3a6e, metalness:0.35, roughness:0.45 }),         // 油箱:深蓝烤漆
+  tankIn: new THREE.MeshStandardMaterial({ color:0x16294d, metalness:0.3, roughness:0.6, side:THREE.BackSide }),
+  tankW:  new THREE.MeshStandardMaterial({ color:0xdde3e8, metalness:0.28, roughness:0.42 }),         // 油箱:浅灰白金属漆(TBEA产品图)
+  tankInW:new THREE.MeshStandardMaterial({ color:0xb9c1c8, metalness:0.25, roughness:0.55, side:THREE.BackSide }),
+  porcD:  new THREE.MeshStandardMaterial({ color:0x3a3f45, metalness:0.08, roughness:0.35 }),         // 深灰伞裙瓷(电容式套管)
+  porcT:  new THREE.MeshStandardMaterial({ color:0xeef1f4, metalness:0.05, roughness:0.22 }),         // 套管顶部白瓷
+  steel:  new THREE.MeshStandardMaterial({ color:0x9aa2ab, metalness:0.85, roughness:0.45 }),         // 银灰磨砂
+  steelD: new THREE.MeshStandardMaterial({ color:0x5c646d, metalness:0.8, roughness:0.5 }),
+  porc:   new THREE.MeshStandardMaterial({ color:0xe8e2d5, metalness:0.05, roughness:0.25 }),         // 白瓷
+  porcB:  new THREE.MeshStandardMaterial({ color:0x8a5a3b, metalness:0.05, roughness:0.3 }),          // 棕瓷
+  oil:    new THREE.MeshPhysicalMaterial({ color:0xd8860b, metalness:0, roughness:0.05,
+            transmission:0.85, thickness:1.2, transparent:true, opacity:0.55, ior:1.47 }),            // 半透明琥珀油
+  brass:  new THREE.MeshStandardMaterial({ color:0xb08d3e, metalness:1, roughness:0.3 }),
+  red:    new THREE.MeshStandardMaterial({ color:0xa83232, metalness:0.3, roughness:0.5 }),
+  green:  new THREE.MeshStandardMaterial({ color:0x2e6e46, metalness:0.3, roughness:0.6 }),
+  black:  new THREE.MeshStandardMaterial({ color:0x22262b, metalness:0.4, roughness:0.6 }),
+  white:  new THREE.MeshStandardMaterial({ color:0xdadde2, metalness:0.1, roughness:0.5 }),
+  arc:    new THREE.MeshBasicMaterial({ color:0x88ccff, transparent:true, opacity:0.9 }),             // 电弧
+};
+
+// ---------- 零件信息数据库（悬浮信息卡内容） ----------
+const PART_INFO = {};
+function regInfo(key, info){ PART_INFO[key] = info; }
+// 信息字段: name/en/material/func/params/state(动态函数)
+regInfo('core',{ name:'铁芯（芯柱/铁轭）', en:'Core (Limb / Yoke)',
+  material:'高导磁冷轧取向硅钢片 30Q120，片厚0.23mm，退火+无机绝缘涂层，阶梯接缝叠装',
+  func:'构成闭合磁路，将高压绕组产生的交变磁通高效耦合至低压绕组，是电磁能量转换的磁通路',
+  params:'铁芯直径 Φ650mm；叠片系数 0.96；额定磁通密度 1.70T；空载损耗 ≤0.8W/kg',
+  state:()=>`磁通密度 ${S.flux.toFixed(2)} T ｜ 励磁电流 ${S.iMag.toFixed(1)} A`});
+regInfo('clamp',{ name:'铁芯夹件 / 拉带', en:'Core Clamp / Strap',
+  material:'低磁钢板 Q345，环氧玻璃丝拉带绑扎', func:'夹紧铁芯叠片、承受短路电动力，保证磁路结构稳定',
+  params:'夹紧力 ≥120kN；对地绝缘 ≥1000MΩ', state:()=>'结构正常'});
+regInfo('hv',{ name:'高压绕组', en:'HV Winding',
+  material:'无氧铜扁线 T2， Nomex 纸包绝缘，纠结连续式绕制，端部设静电屏',
+  func:'接入电网高压侧，通过电磁感应将电能传递至低压侧；承受雷电冲击与操作过电压',
+  params:'额定 220kV/√3；匝数 1680 匝；导线截面 245mm²；绝缘等级 F级；雷电冲击耐受 950kV',
+  state:()=>`载流 ${S.i1.toFixed(0)} A ｜ 温度 ${S.tWind.toFixed(0)} ℃`});
+regInfo('lv',{ name:'低压绕组', en:'LV Winding',
+  material:'无氧铜箔/扁线，双层纸包绝缘，螺旋式绕制',
+  func:'感应电动势并向 35kV 侧负载输出电能',
+  params:'额定 35kV/√3；匝数 268 匝；电流密度 3.2A/mm²',
+  state:()=>`载流 ${S.i2.toFixed(0)} A ｜ 温度 ${(S.tWind-4).toFixed(0)} ℃`});
+regInfo('tapw',{ name:'调压绕组', en:'Tap Winding',
+  material:'纸包铜扁线，独立层式结构', func:'配合有载分接开关实现 ±8×1.25% 有载调压',
+  params:'调压范围 ±10%；级电压 2750V', state:()=>`当前档位 ${S.tap} 档`});
+regInfo('insul',{ name:'绝缘筒 / 端圈 / 角环', en:'Insulating Cylinder / End Ring',
+  material:'高密度绝缘纸板（硫酸盐木浆热压成型），厚 3~6mm',
+  func:'主绝缘屏障，分隔高/低压绕组与铁芯、油箱，构成油-纸复合绝缘系统',
+  params:'工频耐受 85kV/mm（油中）；聚合度 ≥1000（新纸）', state:()=>'绝缘完好'});
+regInfo('spacer',{ name:'撑条 / 绝缘垫块', en:'Spacer / Block',
+  material:'层压木/高密度纸板', func:'构成绕组轴向油道并承受轴向压紧力',
+  params:'垫块压缩量 8~10%；油道宽 6mm', state:()=>'正常'});
+regInfo('oil',{ name:'变压器油（绝缘油）', en:'Transformer Oil',
+  material:'25# 环烷基矿物绝缘油，真空脱气脱水注油',
+  func:'绝缘 + 冷却双重作用：填充绝缘间隙并通过对流/热虹吸带走绕组与铁芯热量',
+  params:'击穿电压 ≥60kV/2.5mm；介质损耗 tanδ ≤0.005（90℃）；含水量 ≤15mg/L',
+  state:()=>`顶层油温 ${S.tTop.toFixed(1)} ℃ ｜ 油位 ${S.oilLevel.toFixed(0)} %`});
+regInfo('tank',{ name:'油箱箱体 / 箱盖', en:'Tank / Cover',
+  material:'Q235B 钢板焊接，壁厚 10mm，内表面防锈漆、外表面深蓝烤漆（橘皮纹理）',
+  func:'盛装绝缘油与器身，承受全真空与正压密封试验；提供机械保护与接地路径',
+  params:'真空度 ≤133Pa；密封试验 0.05MPa/24h 无渗漏',
+  state:()=>`内部油压 ${(0.02+S.tTop*0.0002).toFixed(3)} MPa`});
+regInfo('rib',{ name:'加强筋 / 吊钩 / 铭牌', en:'Rib / Lifting Lug / Nameplate',
+  material:'Q235 型钢 / 锻钢吊钩 / 不锈钢蚀刻铭牌', func:'增强油箱刚度；起吊器身；标识额定参数',
+  params:'起吊能力 60t；额定容量 120MVA；Uk=12%', state:()=>'正常'});
+regInfo('drain',{ name:'放油阀 / 排污阀 / 取样阀', en:'Drain / Sampling Valve',
+  material:'黄铜球阀 DN50 / DN25', func:'检修放油、底部排污、色谱取样',
+  params:'公称压力 1.0MPa', state:()=>'关闭'});
+regInfo('rad',{ name:'片式散热器', en:'Panel Radiator',
+  material:'冷轧钢板 08Al 冲压成型，银灰涂装，共 12 组',
+  func:'利用热虹吸自然循环（ONAN）将油中热量散至空气',
+  params:'总散热面积 480m²；单组 18 片', state:()=>`散热功率 ${(S.lossKW*(S.tTop>S.amb+8?1:0)).toFixed(0)} kW`});
+regInfo('fan',{ name:'冷却风扇', en:'Cooling Fan',
+  material:'铝合金叶轮 + IP55 电机', func:'顶层油温 ≥65℃ 或负载 ≥80% 时投入，强制风冷（ONAF）',
+  params:'风量 9000m³/h ×4', state:()=>S.fanOn?'运转中 🌀':'停止'});
+regInfo('pump',{ name:'油泵 / 油流继电器', en:'Oil Pump / Flow Relay',
+  material:'离心式潜油泵 / 挡板式流量继电器', func:'强油循环时驱动油流；监测油流状态，失流报警',
+  params:'流量 40m³/h；动作值 0.7×额定流量', state:()=>S.fanOn?'油流正常':'自然循环'});
+regInfo('bushH',{ name:'高压套管（电容式）', en:'HV Bushing (Condenser)',
+  material:'油浸纸电容芯子 + 高强度瓷套，尾部均压球',
+  func:'将 220kV 引线安全引出油箱，电容均压使轴向/径向电场均匀分布',
+  params:'额定 252kV/1250A；BIL 1050kV；tanδ ≤0.007',
+  state:()=>`对地电压 ${(S.v1/Math.sqrt(3)).toFixed(1)} kV`});
+regInfo('bushL',{ name:'低压套管 / 中性点套管', en:'LV / Neutral Bushing',
+  material:'纯瓷式/油纸套管', func:'35kV 侧及中性点引出',
+  params:'额定 40.5kV/3150A', state:()=>`载流 ${S.i2.toFixed(0)} A`});
+regInfo('oltc',{ name:'有载分接开关 (OLTC)', en:'On-Load Tap Changer',
+  material:'M型切换开关 + 选择开关 + 电动机构，触头铜钨合金',
+  func:'带负载切换调压绕组分接头，实现不停电调压；过渡电阻限制切换环流',
+  params:'17 档 ±8×1.25%；切换时间 40~60ms；电寿命 5万次',
+  state:()=>`${S.tap} 档 ｜ ${S.tapAnim>0?'切换中⚡':'待命'}`});
+regInfo('buchholz',{ name:'气体继电器（瓦斯继电器）', en:'Buchholz Relay',
+  material:'铸铝壳体，浮球+挡板双元件', func:'油箱与储油柜连接管路上：轻瓦斯（集气 250mL）报警，重瓦斯（油流 1.2m/s）跳闸',
+  params:'轻瓦斯容积 250~300mL；重瓦斯流速整定 1.0~1.2m/s',
+  state:()=>S.gasAlarm?'⚠ 轻瓦斯动作-报警':'正常'});
+regInfo('prv',{ name:'压力释放阀 / 安全气道', en:'Pressure Relief Valve',
+  material:'弹簧盘式，铝合金', func:'内部故障压力骤升时瞬时开启泄压，防止油箱爆裂',
+  params:'开启压力 55kPa；关闭时间 ≤2ms', state:()=>'待命'});
+regInfo('conserv',{ name:'储油柜（油枕）', en:'Conservator',
+  material:'Q235 圆筒 + 橡胶隔膜/胶囊', func:'补偿油温变化引起的油体积胀缩，使油箱始终满油并隔绝空气',
+  params:'容积 8% 总油量；工作油位 20%~90%',
+  state:()=>`油位 ${S.oilLevel.toFixed(0)} % ${S.oilLevel<25?'⚠ 偏低':''}`});
+regInfo('breather',{ name:'吸湿器（呼吸器）', en:'Dehydrating Breather',
+  material:'变色硅胶（蓝色→粉红指示受潮）', func:'储油柜呼吸时干燥进入空气，防止油受潮',
+  params:'硅胶 5kg；更换判据 2/3 变色', state:()=>'干燥正常'});
+regInfo('thermo',{ name:'温度计（油温/绕温）', en:'Thermometer',
+  material:'压力式温包 + 电流互感器热模拟', func:'监测顶层油温与绕组热点温度，联动冷却器投切与超温报警/跳闸',
+  params:'报警 85℃；跳闸 95℃；绕组热点系数 1.3',
+  state:()=>`油温 ${S.tTop.toFixed(1)}℃ ｜ 绕温 ${S.tWind.toFixed(1)}℃`});
+regInfo('cabinet',{ name:'控制柜 / 汇控箱', en:'Control & Marshalling Cabinet',
+  material:'冷轧钢板喷塑', func:'汇集冷却器控制、测温、瓦斯等二次回路端子',
+  params:'防护等级 IP55', state:()=>'运行中' });
+regInfo('gauge',{ name:'油位计', en:'Oil Level Gauge',
+  material:'浮子连杆 + 磁耦合表盘', func:'指示储油柜油位，低油位报警',
+  params:'报警值 25%', state:()=>`油位 ${S.oilLevel.toFixed(0)} %`});
+regInfo('ground',{ name:'接地装置 / 接地螺栓 / 接地片', en:'Earthing Device',
+  material:'镀锡铜排 50×5 / 不锈钢螺栓 M16', func:'铁芯一点接地、外壳保护接地，防止悬浮电位放电',
+  params:'接地电阻 ≤0.5Ω；铁芯接地电流 ≤100mA', state:()=>'接地良好 42mA'});
+regInfo('lead',{ name:'引线 / 引线接头', en:'Lead / Connector',
+  material:'纸包铜绞线 + 冷压接端子', func:'绕组出线与分接开关、套管间的内部连接',
+  params:'接头电阻 ≤5μΩ；绝缘包扎 6mm',
+  state:()=>`载流 ${S.i1.toFixed(0)} A ｜ 接头温升 ${(S.load*0.35).toFixed(0)}K`});
+regInfo('plug',{ name:'放气塞', en:'Air Release Plug',
+  material:'黄铜 M12', func:'注油后排除套管、升高座顶部残存气体',
+  params:'—', state:()=>'密封'});
+
+/* =====================================================================
+ * 三、高精度结构建模（可拆解级：所有核心零部件）
+ * 尺寸单位：米。支持 TBEA 110/220/500kV 三档中国设备模型族切换。
+ * ===================================================================== */
+// TBEA 官方产品库 · 中国设备模型族参数表
+const MODEL_SPECS = {
+  '110': { name:'SSZ-100000/110', kv:110, mva:100, v1:110, v2:37, vMin:95, vMax:125,
+    ratio:'110/37/6.3', group:'YNyn0d11（三绕组）', cool:'ONAN 油浸自冷',
+    scale:0.85, bushH:2.6, radN:8, fansN:0, sideLimbs:false,
+    white:true, boxCons:true, ladder:true, bushTilt:0.12, tank:[5.4,4.2,2.4],
+    desc:'三相三绕组有载调压电力变压器', feat:'110kV三绕组 · 有载调压 · 全密封' },
+  '220': { name:'SFSZ-240000/220', kv:220, mva:240, v1:220, v2:121, vMin:180, vMax:252,
+    ratio:'220/121/38.5', group:'YNyn0d11', cool:'ONAN/ONAF',
+    scale:1.0, bushH:4.0, radN:10, fansN:0, sideLimbs:false,
+    white:true, consLong:true, ladder:true, bushTilt:0.3, tank:[6.4,4.2,2.8],
+    desc:'三相三绕组有载调压电力变压器', feat:'220kV三绕组 · 240/240/120MVA' },
+  '500': { name:'SF-180000/500', kv:500, mva:180, v1:525, v2:36, vMin:500, vMax:560,
+    ratio:'(525±2×2.5%)/36', group:'YNd11', cool:'ONAN/ONAF',
+    scale:1.05, bushH:3.3, radN:13, fansN:0, sideLimbs:false,
+    white:true, consCylTop:true, ladder:true, finH:3.4, tank:[7.8,4.1,2.9], radFan:true,
+    pFe:65, pCu:481,                                          // 空载/负载损耗 kW（官方参数）
+    desc:'500kV三相双绕组电力变压器', feat:'短路阻抗12% · 噪声≤70dB · 顶层油温升44K' },
+};
+let CUR_SPEC = MODEL_SPECS['110'];
+
+const root = new THREE.Group(); scene.add(root);
+const pickables = [];      // 可拾取零件
+const explodables = [];    // 爆炸视图项 {obj, dir, base}
+const FAULT_PARTS = { overheat:[], discharge:[], partial:[], oil:[] }; // 故障定位标记组
+
+// 跨段共享的模型几何量与关键部件引用（随模型切换重建）
+let BASE_Y = 0.5, limbX = [-1.6,0,1.6], limbR = 0.34, limbH = 3.4, coreCY = 2.6;
+let tankW = 6.2, tankH = 4.4, tankD = 3.2, tankCY = 2.85, TOP_Y = 5.05;
+let oilBody, tankWall, lid, cons, consOil, prvCap, movingContact, arc;
+let fans = [];
+let clipTargets = [];
+
+function buildModel(specKey){
+  const SPEC = MODEL_SPECS[specKey]; CUR_SPEC = SPEC;
+  // 保留油流粒子与电磁特效层（作为 root 子级随模型缩放）
+  const fxKeep = root.children.filter(o=>o.userData && o.userData.fxKeep);
+  root.clear();
+  pickables.length = 0; explodables.length = 0;
+  Object.keys(FAULT_PARTS).forEach(k=>FAULT_PARTS[k].length=0);
+  root.scale.setScalar(SPEC.scale);
+  // 外观材质选择：110kV 按 TBEA 产品图（浅灰白金属漆 + 深灰伞裙套管）
+  const tankMat = SPEC.white ? M.tankW : M.tank;
+  const radMat  = SPEC.white ? M.tankW : M.steel;
+  const bushHMat= SPEC.white ? M.porcT : M.porc;   // 高压套管瓷体
+  const shedMat = SPEC.white ? M.porcD : bushHMat; // 伞裙
+  const bushLMat= SPEC.white ? M.porcD : M.porcB;  // 低压套管
+  // 箱体尺寸按型号：110kV 参考图为窄深高箱（散热器占满正面）
+  const TD = SPEC.tank || [6.2, 4.4, 3.2];
+  tankW = TD[0]; tankH = TD[1]; tankD = TD[2];
+
+function mkMesh(geo, mat, infoKey, opts={}){
+  const m = new THREE.Mesh(geo, mat);
+  m.castShadow = true; m.receiveShadow = true;
+  if(infoKey){ m.userData.key = infoKey; pickables.push(m); }
+  if(opts.fault) FAULT_PARTS[opts.fault].push(m);
+  if(opts.explode){ explodables.push({ obj:m, dir:new THREE.Vector3(...opts.explode), base:null }); }
+  (opts.parent||root).add(m);
+  return m;
+}
+const Cyl = (r1,r2,h,seg=40)=>new THREE.CylinderGeometry(r1,r2,h,seg);
+const Box = (w,h,d)=>new THREE.BoxGeometry(w,h,d);
+const Sph = (r)=>new THREE.SphereGeometry(r,24,18);
+const Tor = (r,t)=>new THREE.TorusGeometry(r,t,14,48);
+
+BASE_Y = 0.5; // 基础上表面
+
+/* ---------- 1. 磁路系统：三相三柱铁芯 ---------- */
+const coreG = new THREE.Group(); root.add(coreG);
+limbX = [-1.6, 0, 1.6]; limbR = 0.34; limbH = 3.4; coreCY = BASE_Y + 2.1;
+explodables.push({ obj:coreG, dir:new THREE.Vector3(0,1.6,0), base:null });
+limbX.forEach(x=>{
+  // 芯柱（阶梯截面简化为圆柱+叠片纹理环）
+  const limb = mkMesh(Cyl(limbR, limbR, limbH, 28), M.core, 'core', { parent:coreG, fault:'overheat' });
+  limb.position.set(x, coreCY, 0);
+  // 叠片缝视觉：多道细环模拟 0.23mm 硅钢片叠积纹理
+  for(let i=0;i<7;i++){
+    const ring = mkMesh(Tor(limbR+0.005, 0.006), M.steelD, null, { parent:coreG });
+    ring.rotation.x = Math.PI/2;
+    ring.position.set(x, coreCY - limbH/2 + 0.3 + i*0.45, 0);
+  }
+});
+// 上、下铁轭
+[[coreCY+limbH/2+0.17],[coreCY-limbH/2-0.17]].forEach(([y])=>{
+  const yoke = mkMesh(Box(SPEC.sideLimbs?5.6:4.3, 0.36, 0.62), M.core, 'core', { parent:coreG, fault:'overheat' });
+  yoke.position.set(0, y, 0);
+});
+// 夹件（上下左右）
+[[0,coreCY+limbH/2+0.42,0.42],[0,coreCY+limbH/2+0.42,-0.42],
+ [0,coreCY-limbH/2-0.42,0.42],[0,coreCY-limbH/2-0.42,-0.42]].forEach(p=>{
+  const c = mkMesh(Box(4.6, 0.16, 0.1), M.steelD, 'clamp', { parent:coreG });
+  c.position.set(...p);
+});
+// 拉带
+limbX.forEach(x=>{ [-0.9,0,0.9].forEach(dy=>{
+  const s = mkMesh(Tor(limbR+0.02, 0.012), M.brass, 'clamp', { parent:coreG });
+  s.rotation.x = Math.PI/2; s.position.set(x, coreCY+dy, 0);
+});});
+// 铁芯接地片
+// 500kV 单相自耦：旁柱调压结构（调压绕组布置于主柱两侧旁柱）
+if(SPEC.sideLimbs){
+  [-2.35, 2.35].forEach(x=>{
+    const sl = mkMesh(Cyl(0.22,0.22,limbH*0.92,20), M.core, 'core', { parent:coreG, fault:'overheat' });
+    sl.position.set(x, coreCY, 0);
+    const sw = mkMesh(Cyl(0.31,0.31,limbH*0.62,20), M.copper, 'tapw', { parent:coreG, fault:'overheat' });
+    sw.position.set(x, coreCY, 0);
+    const si = mkMesh(Cyl(0.34,0.34,limbH*0.66,20), M.paper, 'insul', { parent:coreG });
+    si.position.set(x, coreCY, 0);
+  });
+}
+const gndTab = mkMesh(Box(0.1,0.5,0.02), M.copper2, 'ground', { parent:coreG });
+gndTab.position.set(2.25, coreCY-1.5, 0.35);
+
+/* ---------- 2. 电路系统：高/低压/调压绕组 + 绝缘 ---------- */
+const windG = new THREE.Group(); root.add(windG);
+limbX.forEach((x,idx)=>{
+  const ex = [ (idx-1)*1.2, 1.0, (idx-1)*0.6 ]; // 爆炸方向
+  // 低压绕组（内层）
+  const lv = mkMesh(Cyl(0.46,0.46,3.0,36), M.copper2, 'lv', { fault:'overheat' });
+  lv.position.set(x, coreCY, 0); windG.add(lv);
+  explodables.push({obj:lv, dir:new THREE.Vector3(ex[0],0.3,ex[2]+0.8), base:null});
+  // 低压-高压间绝缘筒
+  const ins1 = mkMesh(Cyl(0.52,0.52,3.05,36), M.paper, 'insul');
+  ins1.position.set(x, coreCY, 0); windG.add(ins1);
+  explodables.push({obj:ins1, dir:new THREE.Vector3(ex[0]*1.3,0.5,(ex[2]+0.8)*1.3), base:null});
+  // 高压绕组（纠结连续式，分段饼式外观）
+  const hv = new THREE.Group(); windG.add(hv);
+  hv.position.set(x, coreCY, 0);
+  const nCakes = 12;
+  for(let i=0;i<nCakes;i++){
+    const cake = mkMesh(Tor(0.66, 0.075), M.copper, 'hv', { parent:hv, fault:'overheat' });
+    cake.rotation.x = Math.PI/2;
+    cake.position.y = -1.32 + i*(2.64/(nCakes-1));
+    // 线饼间绝缘垫块
+    for(let k=0;k<6;k++){
+      const a = k*Math.PI/3;
+      const blk = mkMesh(Box(0.09,0.035,0.14), M.press, 'spacer', { parent:hv });
+      blk.position.set(Math.cos(a)*0.66, cake.position.y+0.09, Math.sin(a)*0.66);
+    }
+  }
+  // 静电屏（端部均压环）
+  [-1.48,1.48].forEach(dy=>{
+    const sc = mkMesh(Tor(0.66,0.05), M.brass, 'hv', { parent:hv });
+    sc.rotation.x = Math.PI/2; sc.position.y = dy;
+  });
+  // 端圈
+  [-1.42,1.42].forEach(dy=>{
+    const er = mkMesh(Cyl(0.78,0.78,0.06,36), M.paper, 'insul', { parent:hv });
+    er.position.y = dy;
+  });
+  explodables.push({obj:hv, dir:new THREE.Vector3(ex[0]*1.6,0.7,(ex[2]+0.8)*1.6), base:null});
+  // 调压绕组（最外层）
+  const tw = mkMesh(Cyl(0.86,0.86,2.2,36), M.copper2, 'tapw', { fault:'overheat' });
+  tw.position.set(x, coreCY+0.2, 0); windG.add(tw);
+  explodables.push({obj:tw, dir:new THREE.Vector3(ex[0]*2.0,0.9,(ex[2]+0.8)*2.0), base:null});
+  // 撑条（轴向油道）
+  for(let k=0;k<8;k++){
+    const a=k*Math.PI/4;
+    const st = mkMesh(Box(0.05,3.0,0.1), M.press, 'spacer');
+    st.position.set(x+Math.cos(a)*0.59, coreCY, Math.sin(a)*0.59);
+    windG.add(st);
+  }
+});
+// 引线（绕组→套管/分接开关）
+limbX.forEach((x,i)=>{
+  const lead = mkMesh(Cyl(0.05,0.05,1.6,12), M.copper, 'lead', { fault:'discharge' });
+  lead.position.set(x, coreCY+2.2, -0.3); lead.rotation.x = 0.25; root.add(lead);
+  const joint = mkMesh(Sph(0.08), M.brass, 'lead', { fault:'discharge' });
+  joint.position.set(x, coreCY+2.95, -0.5); root.add(joint);
+});
+
+/* ---------- 3. 变压器油（器身油体，半透明琥珀） ---------- */
+oilBody = mkMesh(Box(tankW-0.6, tankH-0.3, tankD-0.5), M.oil, 'oil', { fault:'oil' });
+oilBody.position.set(0, BASE_Y+tankH/2+0.05, 0);
+oilBody.castShadow = false;
+
+/* ---------- 4. 油箱与结构件 ---------- */
+const tankG = new THREE.Group(); root.add(tankG);
+tankCY=BASE_Y+tankH/2+0.15;
+// 箱体（外壁，剖视可切）
+tankWall = mkMesh(Box(tankW,tankH,tankD), tankMat, 'tank');
+tankWall.position.y = tankCY; tankG.add(tankWall);
+// 箱盖（大钟罩沿）
+lid = mkMesh(Box(tankW+0.3, 0.14, tankD+0.3), tankMat, 'tank');
+lid.position.y = tankCY+tankH/2+0.07; tankG.add(lid);
+explodables.push({obj:lid, dir:new THREE.Vector3(0,2.6,0), base:null});
+// 箱沿法兰螺栓圈（示意可见紧固件）
+for(let i=0;i<26;i++){
+  const t=i/26*Math.PI*2;
+  const bx = Math.cos(t)*(tankW/2+0.08), bz = Math.sin(t)*(tankD/2+0.08);
+  const bolt = mkMesh(Cyl(0.03,0.03,0.09,8), M.steel, null);
+  bolt.position.set(Math.abs(bx)>tankW/2? Math.sign(bx)*(tankW/2+0.08):bx,
+    tankCY+tankH/2+0.05, Math.abs(bx)<=tankW/2? Math.sign(bz)*(tankD/2+0.08):bz);
+  tankG.add(bolt);
+}
+// 加强筋
+[-2.4,-1.2,0,1.2,2.4].forEach(x=>{
+  const rib = mkMesh(Box(0.12, tankH-0.3, 0.08), tankMat, 'rib');
+  rib.position.set(x, tankCY, tankD/2+0.04); tankG.add(rib);
+  const rib2 = rib.clone(); rib2.position.z = -tankD/2-0.04;
+  rib2.userData.key='rib'; pickables.push(rib2); tankG.add(rib2);
+});
+// 端壁竖筋（white 机型参考图端面可见）
+if(SPEC.white){
+  [-0.9,0,0.9].forEach(z=>{
+    [1,-1].forEach(sx=>{
+      const er = mkMesh(Box(0.08, tankH-0.4, 0.12), tankMat, 'rib');
+      er.position.set(sx*(tankW/2+0.04), tankCY, z); tankG.add(er);
+    });
+  });
+  // 底部基座梁（图中深色底框）
+  [-0.95,0.95].forEach(z=>{
+    const bm = mkMesh(Box(tankW+0.3, 0.24, 0.42), M.steelD, 'rib');
+    bm.position.set(0, BASE_Y-0.12, z); tankG.add(bm);
+  });
+}
+if(SPEC.consCylTop){
+  // 图2：左端独立控制柜（略高于箱沿，带顶檐与柜门缝）
+  const cab = new THREE.Group(); cab.position.set(-tankW/2-0.62, BASE_Y, 0.35); root.add(cab);
+  const cabBody = mkMesh(Box(0.95, 3.5, 1.7), M.white, 'cabinet', { parent:cab });
+  cabBody.position.set(0, 1.75, 0);
+  const cabTop  = mkMesh(Box(1.05, 0.1, 1.8), M.white, 'cabinet', { parent:cab });
+  cabTop.position.set(0, 3.55, 0);
+  [-0.25,0.25].forEach(z=>{ // 柜门缝
+    const seam = mkMesh(Box(0.02, 3.1, 0.03), M.steelD, 'cabinet', { parent:cab });
+    seam.position.set(-0.49, 1.7, z);
+  });
+  // 图1：右端汇控箱（贴端壁下半部）
+  const mb = mkMesh(Box(0.5, 1.7, 1.1), M.white, 'cabinet');
+  mb.position.set(tankW/2+0.3, BASE_Y+1.05, -0.5); root.add(mb);
+  const mbDoor = mkMesh(Box(0.03, 1.4, 0.8), M.steelD, 'cabinet');
+  mbDoor.position.set(tankW/2+0.56, BASE_Y+1.05, -0.5); root.add(mbDoor);
+  // 底部加强筋裙板（图2 底缘三角形筋板阵列，以小板近似）
+  for(let i=0;i<12;i++){
+    const gx = -tankW/2+0.45+i*(tankW-0.9)/11;
+    [1,-1].forEach(sz=>{
+      const gs = mkMesh(Box(0.1, 0.5, 0.34), tankMat, 'rib');
+      gs.position.set(gx, BASE_Y+0.05, sz*(tankD/2+0.02)); tankG.add(gs);
+    });
+  }
+}
+// 铭牌
+const plate = mkMesh(Box(0.7,0.5,0.02), M.steel, 'rib');
+plate.position.set(1.8, BASE_Y+1.6, tankD/2+0.06); tankG.add(plate);
+// 吊钩
+[[-2.2,1.2],[2.2,1.2],[-2.2,-1.2],[2.2,-1.2]].forEach(([x,z])=>{
+  const lug = mkMesh(Tor(0.12,0.035), M.steelD, 'rib');
+  lug.position.set(x, tankCY+tankH/2+0.2, z); tankG.add(lug);
+});
+// 放油阀 / 取样阀 / 排污阀 / 放气塞
+const dv = mkMesh(Cyl(0.07,0.07,0.3,14), M.brass, 'drain');
+if(SPEC.white){ dv.rotation.z = Math.PI/2; dv.position.set(-tankW/2-0.15, BASE_Y+0.5, 0.6); }
+else { dv.rotation.x = Math.PI/2; dv.position.set(-2.0, BASE_Y+0.5, tankD/2+0.15); } tankG.add(dv);
+const sv = mkMesh(Cyl(0.04,0.04,0.22,12), M.brass, 'drain');
+sv.rotation.x = Math.PI/2; sv.position.set(0.8, BASE_Y+0.9, tankD/2+0.12); tankG.add(sv);
+const ap = mkMesh(Cyl(0.025,0.025,0.1,10), M.brass, 'plug');
+ap.position.set(-0.6, tankCY+tankH/2+0.18, 0.8); tankG.add(ap);
+// 接地螺栓
+const gb = mkMesh(Cyl(0.04,0.04,0.12,10), M.steel, 'ground');
+gb.position.set(2.9, BASE_Y+0.4, tankD/2-0.5); gb.rotation.z=Math.PI/2; tankG.add(gb);
+
+/* ---------- 5. 冷却系统：片式散热器 + 风扇 ---------- */
+const radG = new THREE.Group(); root.add(radG);
+if(SPEC.white){
+  // ===== TBEA 白漆参考图样式：正面 N 组宽面板散热器，贴壁、几乎等高、底部圆集油囊 =====
+  const n = SPEC.radN, step = (tankW-1.0)/(n-1);
+  const fH = SPEC.finH || (SPEC.consLong ? 3.5 : 3.3);  // 散热片高度随型号
+  for(let i=0;i<n;i++){
+    const rx = -(tankW/2-0.5) + i*step, rz = tankD/2+0.36;
+    const rad = new THREE.Group(); rad.position.set(rx, BASE_Y+2.25, rz); radG.add(rad);
+    const pw = step*(SPEC.consCylTop?0.7:0.8);    // 面板宽度随组距自适应（500 组间露箱壁）
+    for(let p=0;p<3;p++){ // 宽面板：3 片竖直波纹板
+      const fin = mkMesh(Box(pw, fH, 0.05), radMat, 'rad', { parent:rad, fault:'oil' });
+      fin.position.z = p*0.09;
+    }
+    // 顶部水平集油管 + 箱壁连接短管
+    const hdT = mkMesh(Cyl(0.09,0.09,pw,12), radMat, 'rad', { parent:rad });
+    hdT.rotation.z = Math.PI/2; hdT.position.y = fH/2;
+    const cnT = mkMesh(Cyl(0.07,0.07,0.3,10), radMat, 'rad', { parent:rad });
+    cnT.rotation.x = Math.PI/2; cnT.position.set(0, fH/2, -0.22);
+    // 底部圆集油囊（参考图底部一排圆罐）：横管 + 两端球形封头
+    const br0 = 0.14;
+    const hdB = mkMesh(Cyl(br0,br0,pw,12), radMat, 'rad', { parent:rad });
+    hdB.rotation.z = Math.PI/2; hdB.position.y = -fH/2;
+    [-pw/2, pw/2].forEach(dx=>{
+      const capB = mkMesh(Sph(br0), radMat, 'rad', { parent:rad });
+      capB.scale.x = 0.6; capB.position.set(dx, hdB.position.y, 0);
+    });
+    if(SPEC.radFan){
+      // ===== 500kV 参考图：每组散热器下方一台底吹风扇（ONAF） =====
+      const fu = new THREE.Group(); fu.position.set(0, -fH/2-0.2, 0.14); rad.add(fu);
+      const cage = mkMesh(Cyl(0.24,0.24,0.16,20), M.white, 'fan', { parent:fu });
+      cage.rotation.x = Math.PI/2;
+      const ring = mkMesh(Tor(0.24,0.025), M.steelD, 'fan', { parent:fu });
+      const blades = new THREE.Group(); blades.position.z = 0.02; fu.add(blades);
+      for(let b=0;b<3;b++){
+        const bl = mkMesh(Box(0.4,0.1,0.02), M.steelD, 'fan', { parent:blades });
+        bl.rotation.z = b*Math.PI*2/3;
+      }
+      const hub = mkMesh(Sph(0.07), M.black, 'fan', { parent:fu });
+      hub.position.z = 0.1;
+      fans.push(blades);   // 纳入风扇旋转动画
+    }
+    const cnB = mkMesh(Cyl(0.07,0.07,0.3,10), radMat, 'rad', { parent:rad });
+    cnB.rotation.x = Math.PI/2; cnB.position.set(0, -fH/2, -0.22);
+    explodables.push({obj:rad, dir:new THREE.Vector3(0,0.4,2.2), base:null});
+  }
+} else {
+  // ===== 220/500kV：双面窄片式散热器 =====
+  for(let side of [-1,1]){
+    for(let i=0;i<SPEC.radPerSide;i++){
+      const rx = -(SPEC.radPerSide-1)*0.5 + i*1.0, rz = side*(tankD/2+0.9);
+      const rad = new THREE.Group(); rad.position.set(rx, BASE_Y+2.3, rz); radG.add(rad);
+      for(let p=0;p<8;p++){ // 散热片
+        const fin = mkMesh(Box(0.05, 2.6, 0.55), radMat, 'rad', { parent:rad, fault:'oil' });
+        fin.position.x = -0.35 + p*0.1;
+      }
+      // 上下集油管
+      [-1.4,1.4].forEach(dy=>{
+        const hd = mkMesh(Cyl(0.12,0.12,0.9,14), radMat, 'rad', { parent:rad });
+        hd.rotation.z = Math.PI/2; hd.position.y = dy;
+      });
+      explodables.push({obj:rad, dir:new THREE.Vector3(0,0.4,side*2.2), base:null});
+    }
+  }
+}
+// 冷却风扇（4台，挂于散热器外侧）
+fans.length = 0;
+for(let i=0;i<SPEC.fansN;i++){
+  const fg = new THREE.Group();
+  fg.position.set(-(SPEC.fansN-1)*0.5+i*1.0, BASE_Y+2.2, tankD/2+1.9);
+  const cage = mkMesh(Tor(0.34,0.03), M.steelD, 'fan', { parent:fg });
+  const blades = new THREE.Group(); fg.add(blades);
+  for(let b=0;b<3;b++){
+    const bl = mkMesh(Box(0.56,0.14,0.02), M.steelD, 'fan', { parent:blades });
+    bl.rotation.z = b*Math.PI*2/3;
+  }
+  const motor = mkMesh(Cyl(0.12,0.12,0.25,14), M.black, 'fan', { parent:fg });
+  motor.rotation.x = Math.PI/2; motor.position.z = -0.12;
+  radG.add(fg); fans.push(blades);
+  explodables.push({obj:fg, dir:new THREE.Vector3(0,0.3,3.0), base:null});
+}
+// 油泵与油流继电器（底部管路）
+const pump = mkMesh(Cyl(0.16,0.16,0.5,16), M.steelD, 'pump');
+pump.rotation.z = Math.PI/2; pump.position.set(-2.2, BASE_Y+0.35, -tankD/2-0.4); root.add(pump);
+const flr = mkMesh(Sph(0.14), M.red, 'pump');
+flr.position.set(-1.6, BASE_Y+0.35, -tankD/2-0.4); root.add(flr);
+// 冷却器控制箱
+const cbox = mkMesh(Box(0.6,0.8,0.3), M.white, 'pump');
+if(SPEC.white){ cbox.position.set(-tankW/2-0.2, BASE_Y+1.2, -0.5); }
+else cbox.position.set(2.6, BASE_Y+1.2, tankD/2+0.3); root.add(cbox);
+
+/* ---------- 6. 套管（高压电容式 / 低压 / 中性点 + 均压球） ---------- */
+function bushing(x, z, h, r, mat, key, shedM, tilt=0, y0=0){
+  const bg = new THREE.Group(); bg.position.set(x, tankCY+tankH/2+y0, z); root.add(bg);
+  bg.rotation.z = tilt;                       // 参考图：高压套管整体微倾
+  const nSheds = Math.floor(h/0.16);
+  const body = mkMesh(Cyl(r*0.55, r*0.75, h, 18), mat, key, { parent:bg, fault:'discharge' });
+  body.position.y = h/2+0.1; body.rotation.z = 0;
+  for(let i=0;i<nSheds;i++){ // 伞裙（可独立配色，还原深灰伞裙）
+    const shed = mkMesh(Cyl(r, r*0.82, 0.05, 18), shedM||mat, key, { parent:bg });
+    shed.position.y = 0.2 + i*(h-0.3)/nSheds;
+  }
+  if(SPEC.consCylTop && mat===M.black){   // 500kV 参考图：黑裙下白瓷基座靴
+    const boot = mkMesh(Cyl(r*0.7, r*0.95, 0.4, 16), M.porcT, key, { parent:bg });
+    boot.position.y = 0.28;
+  }
+  const capMat = (SPEC.consCylTop && mat===M.black) ? M.porcT : M.brass;  // 500kV 参考图白色顶帽
+  const topC = mkMesh(Cyl(r*0.5, r*0.62, 0.3, 14), capMat, key, { parent:bg, fault:'discharge' });
+  topC.position.y = h+0.2;
+  const ball = mkMesh(Sph(r*0.75), M.brass, key, { parent:bg }); // 均压球
+  ball.position.y = 0.05;
+  explodables.push({obj:bg, dir:new THREE.Vector3(x*0.4, 2.0, z*0.6), base:null});
+  return bg;
+}
+TOP_Y = tankCY + tankH/2;
+const BH = SPEC.bushH, TILT = SPEC.bushTilt||0;
+// 升高座（套管底座斜台，参考图可见）
+function turret(x, z, r, tilt){
+  const tb = mkMesh(Cyl(r*1.05, r*1.35, 0.5, 18), tankMat, 'bushH');
+  tb.position.set(x, TOP_Y+0.22, z); tb.rotation.z = tilt; root.add(tb);
+}
+if(SPEC.boxCons){
+  // ===== 110kV 参考图布局：高压 4 支（三相+中性点）沿长轴后排成列 =====
+  [[-1.8,0.16],[-0.6,0.12],[0.6,0.09],[1.8,0.13]].forEach(([x,tt],i)=>{   // 倾角逐支微调（参考图）
+    turret(x, -0.55, 0.26, tt);
+    bushing(x, -0.55, BH*(i===3?0.88:1), 0.26, bushHMat, 'bushH', shedMat, tt);
+  });
+  // 低压 3 支短套管（前排，深瓷）
+  [-1.3,0,1.3].forEach(x=> bushing(x, 0.55, BH*0.38, 0.16, bushLMat, 'bushL'));
+  // 右端 35kV 侧套管 1 支
+  bushing(2.35, 0.4, BH*0.5, 0.18, bushLMat, 'bushL');
+} else if(SPEC.consLong){
+  // ===== 220kV 参考图布局：高压 3 支居左外倾、中压 3 支居右外倾、中性点居中 =====
+  // 高压 220kV（左半前排，向左侧外倾，逐支倾角递减，位于长柜前方）
+  [[-2.3,0.42],[-1.5,0.30],[-0.7,0.18]].forEach(([x,tt])=>{
+    turret(x, 0.55, 0.3, tt);
+    bushing(x, 0.55, BH, 0.30, bushHMat, 'bushH', shedMat, tt);
+  });
+  // 中性点小套管（后排中央）
+  bushing(0.15, -1.0, BH*0.45, 0.16, bushLMat, 'bushL');
+  // 中压 121kV（右半前排，向右侧外倾）
+  [[0.9,-0.15],[1.7,-0.26],[2.45,-0.36]].forEach(([x,tt])=>{
+    turret(x, 0.55, 0.24, tt);
+    bushing(x, 0.55, BH*0.72, 0.24, bushHMat, 'bushH', shedMat, tt);
+  });
+  // 低压 38.5kV 后排短套管
+  [-1.2,0,1.2].forEach(x=> bushing(x, -1.0, BH*0.3, 0.15, bushLMat, 'bushL'));
+} else if(SPEC.consCylTop){
+  // ===== 500kV 参考图布局：左支左倾 / 中支垂直居中 / 右支在箱右端大角度右倾 =====
+  [[-2.6,0.5],[0,0.04],[2.9,-0.62]].forEach(([x,tt])=>{
+    // 大圆台升高座（白漆，参考图约占盖以上 1/3 高度）+ 中部/顶部法兰环
+    const tb = mkMesh(Cyl(0.5, 0.78, 1.45, 22), tankMat, 'bushH');
+    tb.position.set(x, TOP_Y+0.72, 0.25); tb.rotation.z = tt; root.add(tb);
+    const flB = mkMesh(Cyl(0.86, 0.86, 0.12, 22), tankMat, 'bushH');  // 底法兰
+    flB.position.set(x, TOP_Y+0.06, 0.25); flB.rotation.z = tt; root.add(flB);
+    const flM = mkMesh(Cyl(0.68, 0.68, 0.12, 22), tankMat, 'bushH');   // 中部法兰环
+    flM.position.set(x - Math.sin(tt)*1.0, TOP_Y + Math.cos(tt)*1.0, 0.25); flM.rotation.z = tt; root.add(flM);
+    const fl = mkMesh(Cyl(0.6, 0.6, 0.14, 22), tankMat, 'bushH');      // 顶法兰
+    fl.position.set(x - Math.sin(tt)*1.45, TOP_Y + Math.cos(tt)*1.45, 0.25); fl.rotation.z = tt; root.add(fl);
+    // 黑色伞裙套管（自升高座顶沿同轴伸出）
+    bushing(x - Math.sin(tt)*1.52, 0.25, BH, 0.30, M.black, 'bushH', M.black, tt, Math.cos(tt)*1.48);
+  });
+  // 低压 36kV：2 支黑色短柱（居中偏右）+ 左端 1 支（参考图位置）
+  bushing( 1.35, -0.35, BH*0.34, 0.14, M.black, 'bushL', M.black);
+  bushing( 1.95, -0.35, BH*0.34, 0.14, M.black, 'bushL', M.black);
+  bushing(-3.35, -0.3,  BH*0.34, 0.14, M.black, 'bushL', M.black);
+  // 右端白瓷小套管（图 1 右端可见）
+  bushing( 3.45, 0.15, BH*0.36, 0.13, M.porcT, 'bushL');
+  // 柜前白色小端子柱一排（参考图柜前可见）
+  for(let i=0;i<7;i++){
+    const post = mkMesh(Cyl(0.06,0.075,0.65,10), M.porcT, 'bushL');
+    post.position.set(-1.5+i*0.5, TOP_Y+0.32, -0.35); root.add(post);
+    const pcap = mkMesh(Sph(0.075), M.white, 'bushL');
+    pcap.position.set(-1.5+i*0.5, TOP_Y+0.68, -0.35); root.add(pcap);
+  }
+} else {
+  bushing(-1.9, -0.4, BH, 0.30, bushHMat, 'bushH', shedMat, TILT);   // 高压三相
+  bushing(-0.7, -0.7, BH, 0.30, bushHMat, 'bushH', shedMat, TILT);
+  bushing( 0.5, -0.4, BH, 0.30, bushHMat, 'bushH', shedMat, TILT);
+  bushing( 1.6, 0.5, BH*0.5, 0.20, bushLMat, 'bushL');    // 低压三相
+  bushing( 2.3, 0.0, BH*0.5, 0.20, bushLMat, 'bushL');
+  bushing( 2.6, 0.6, BH*0.5, 0.20, bushLMat, 'bushL');
+  bushing(-2.6, 0.6, BH*0.42, 0.16, bushLMat, 'bushL');   // 中性点
+}
+
+// 型号铭牌（按 TBEA 型号动态生成）
+const plateCv = document.createElement('canvas'); plateCv.width=512; plateCv.height=256;
+const pctx = plateCv.getContext('2d');
+pctx.fillStyle='#0c1524'; pctx.fillRect(0,0,512,256);
+pctx.strokeStyle='#22d3ee'; pctx.lineWidth=6; pctx.strokeRect(8,8,496,240);
+pctx.fillStyle='#7dd3fc'; pctx.font='bold 40px "Microsoft YaHei"'; pctx.textAlign='center';
+pctx.fillText(SPEC.name, 256, 70);
+pctx.font='24px "Microsoft YaHei"'; pctx.fillStyle='#9fb8d8';
+pctx.fillText(SPEC.desc, 256, 116);
+pctx.fillText(`容量 ${SPEC.mva}MVA ｜ 电压比 ${SPEC.ratio}kV`, 256, 158);
+pctx.fillText(`接线 ${SPEC.group} ｜ ${SPEC.cool}`, 256, 198);
+pctx.fillStyle='#3d5a7d'; pctx.font='20px "Microsoft YaHei"';
+pctx.fillText('TBEA 特变电工 · 中国设备模型族', 256, 234);
+const plateMesh = mkMesh(new THREE.PlaneGeometry(1.7,0.85),
+  new THREE.MeshBasicMaterial({ map:new THREE.CanvasTexture(plateCv) }), 'tank');
+if(SPEC.white){ plateMesh.position.set(-tankW/2-0.021, BASE_Y+2.4, 0.3); plateMesh.rotation.y = -Math.PI/2; }
+else plateMesh.position.set(0, BASE_Y+2.7, tankD/2+0.021);
+root.add(plateMesh);
+
+/* ---------- 7. 储油柜 / 吸湿器 / 瓦斯继电器 / 压力释放阀 ---------- */
+const consG = new THREE.Group(); root.add(consG);
+explodables.push({obj:consG, dir:new THREE.Vector3(0,3.4,0.8), base:null});
+if(SPEC.consCylTop){
+  // ===== 500kV 参考图样式：横卧圆筒储油柜高置于箱顶后梁上 =====
+  consG.position.set(-0.2, TOP_Y+1.75, -0.85);   // 套管后方、半腰高度（参考图）
+  cons = mkMesh(Cyl(0.62,0.62,3.4,28), tankMat, 'conserv', { parent:consG, fault:'oil' });
+  cons.rotation.z = Math.PI/2;
+  [-1.7,1.7].forEach(x=>{
+    const cap = mkMesh(Sph(0.62), tankMat, 'conserv', { parent:consG });
+    cap.scale.x = 0.4; cap.position.x = x;
+  });
+  // TBEA 蓝色标识（筒身正面）
+  const logoCv3 = document.createElement('canvas'); logoCv3.width=512; logoCv3.height=128;
+  const lc3 = logoCv3.getContext('2d');
+  lc3.fillStyle='#dde3e8'; lc3.fillRect(0,0,512,128);
+  lc3.fillStyle='#1565c0'; lc3.font='bold 60px "Arial"'; lc3.textAlign='center';
+  lc3.fillText('TBEA', 256, 86);
+  const logoM3 = mkMesh(new THREE.PlaneGeometry(1.4,0.35),
+    new THREE.MeshBasicMaterial({ map:new THREE.CanvasTexture(logoCv3) }), 'conserv', { parent:consG });
+  logoM3.position.set(0, 0.1, 0.63);
+  // 内部油面块（油位动画）
+  consOil = mkMesh(Cyl(0.56,0.56,3.2,24), M.oil, 'gauge', { parent:consG });
+  consOil.rotation.z = Math.PI/2; consOil.scale.set(1,1,0.6);
+  // 双立柱支撑（自箱盖直达柜底托架）
+  [-1.1,1.1].forEach(x=>{   // 立柱自箱盖直达柜底托架（不悬空）
+    const col5 = mkMesh(Box(0.18, 1.2, 0.18), tankMat, 'conserv', { parent:consG });
+    col5.position.set(x, -1.18, 0);
+    const tray = mkMesh(Box(0.5, 0.1, 1.5), M.steelD, 'conserv', { parent:consG });
+    tray.position.set(x, -0.66, 0);
+  });
+  // 油位计（柜端面）
+  const oGauge5 = mkMesh(Cyl(0.13,0.13,0.05,18), M.white, 'gauge', { parent:consG });
+  oGauge5.position.set(2.12, 0, 0); oGauge5.rotation.z = -Math.PI/2;
+}
+if(SPEC.consLong){
+  // ===== 220kV 参考图样式：长形储油柜横跨箱顶中央、高架中柱支撑 =====
+  consG.position.set(0.15, TOP_Y+1.95, -0.15);
+  cons = mkMesh(Box(4.4, 0.95, 1.05), tankMat, 'conserv', { parent:consG, fault:'oil' });
+  const consTopL = mkMesh(Box(4.46, 0.07, 1.11), tankMat, 'conserv', { parent:consG });
+  consTopL.position.y = 0.51;
+  // 柜底圆弧过渡（两端半球封头感）
+  [-2.2,2.2].forEach(x=>{
+    const capL = mkMesh(Sph(0.5), tankMat, 'conserv', { parent:consG });
+    capL.scale.set(0.4, 0.95, 1.05); capL.position.x = x;
+  });
+  // TBEA 蓝色标识（柜正面）
+  const logoCv2 = document.createElement('canvas'); logoCv2.width=512; logoCv2.height=128;
+  const lc2 = logoCv2.getContext('2d');
+  lc2.fillStyle='#dde3e8'; lc2.fillRect(0,0,512,128);
+  lc2.fillStyle='#1565c0'; lc2.font='bold 56px "Arial"'; lc2.textAlign='center';
+  lc2.fillText('TBEA', 170, 82);
+  lc2.font='bold 44px "Microsoft YaHei"';
+  lc2.fillText('特变电工', 370, 80);
+  const logoM2 = mkMesh(new THREE.PlaneGeometry(1.6,0.4),
+    new THREE.MeshBasicMaterial({ map:new THREE.CanvasTexture(logoCv2) }), 'conserv', { parent:consG });
+  logoM2.position.set(0, 0.02, 0.535);
+  // 内部油面块（油位动画）
+  consOil = mkMesh(Box(4.2, 0.75, 0.9), M.oil, 'gauge', { parent:consG });
+  consOil.position.y = -0.08;
+  // 中央支撑柱（自箱盖直达柜底，不悬空）+ 两侧斜撑
+  const colC = mkMesh(Box(0.26, 2.0, 0.26), tankMat, 'conserv', { parent:consG });
+  colC.position.set(0, -0.97, 0);
+  [[-1.7],[1.7]].forEach(([x])=>{
+    const st1 = mkMesh(Box(0.09, 2.3, 0.09), M.steelD, 'conserv', { parent:consG });
+    st1.position.set(x, -1.05, 0); st1.rotation.z = x>0? 0.42 : -0.42;
+  });
+  // 油位计（柜右端面）
+  const oGaugeL = mkMesh(Cyl(0.13,0.13,0.05,18), M.white, 'gauge', { parent:consG });
+  oGaugeL.position.set(2.42, 0, 0); oGaugeL.rotation.z = -Math.PI/2;
+}
+if(SPEC.boxCons){
+  // ===== 110kV 参考图样式：矩形胶囊储油柜，高架于油箱右端 =====
+  consG.position.set(tankW/2+0.55, TOP_Y+1.45, 0);   // 外悬于油箱右端（参考图）
+  cons = mkMesh(Box(1.75, 1.1, 2.2), tankMat, 'conserv', { parent:consG, fault:'oil' });
+  // 柜顶圆角沿 + 端盖
+  const consTop = mkMesh(Box(1.81, 0.08, 2.26), tankMat, 'conserv', { parent:consG });
+  consTop.position.y = 0.59;
+  // TBEA 蓝色标识（柜体侧面）
+  const logoCv = document.createElement('canvas'); logoCv.width=512; logoCv.height=128;
+  const lc = logoCv.getContext('2d');
+  lc.fillStyle='#dde3e8'; lc.fillRect(0,0,512,128);
+  lc.fillStyle='#1565c0'; lc.font='bold 56px "Arial"'; lc.textAlign='center';
+  lc.fillText('TBEA', 190, 82);
+  lc.font='bold 44px "Microsoft YaHei"';
+  lc.fillText('特变电工', 390, 80);
+  const logoM = mkMesh(new THREE.PlaneGeometry(1.5,0.38),
+    new THREE.MeshBasicMaterial({ map:new THREE.CanvasTexture(logoCv) }), 'conserv', { parent:consG });
+  logoM.position.set(0, 0.08, 1.205);
+  // 内部油面块（油位动画）
+  consOil = mkMesh(Box(1.55, 0.9, 2.0), M.oil, 'gauge', { parent:consG });
+  consOil.position.y = -0.08;
+  // 油位计（端面圆形表盘）
+  const oGaugeB = mkMesh(Cyl(0.13,0.13,0.05,18), M.white, 'gauge', { parent:consG });
+  oGaugeB.position.set(0.9, -0.1, 0.6); oGaugeB.rotation.z = -Math.PI/2;
+  // 斜撑支架 ×2（自箱盖斜撑至柜底）
+  [[-0.7],[0.7]].forEach(([z])=>{   // 八字斜撑：柜底 → 油箱右端壁
+    const brk = mkMesh(Box(0.09, 2.2, 0.09), M.steelD, 'conserv', { parent:consG });
+    brk.position.set(-0.75, -1.35, z); brk.rotation.z = 0.62;
+    const brk2 = mkMesh(Box(0.09, 2.2, 0.09), M.steelD, 'conserv', { parent:consG });
+    brk2.position.set(0.35, -1.35, z); brk2.rotation.z = -0.62;
+  });
+  // 左端 OLTC 小油枕（卧式圆筒 + 油位视窗）
+  const pil = mkMesh(Cyl(0.28,0.28,1.0,20), tankMat, 'conserv', { fault:'oil' });
+  pil.rotation.x = Math.PI/2; pil.position.set(-tankW/2+0.5, TOP_Y+0.62, -0.35); root.add(pil);
+  [-0.5,0.5].forEach(dz=>{   // 小油枕端盖
+    const pc2 = mkMesh(Sph(0.28), tankMat, 'conserv');
+    pc2.scale.z=0.4; pc2.position.set(-tankW/2+0.5, TOP_Y+0.62, -0.35+dz); root.add(pc2);
+  });
+  const pilEye = mkMesh(Cyl(0.11,0.11,0.04,16), M.black, 'gauge');
+  pilEye.rotation.x = Math.PI/2; pilEye.position.set(-tankW/2+0.5, TOP_Y+0.62, 0.18); root.add(pilEye);
+  // 小油枕支座
+  const psup = mkMesh(Box(0.1,0.55,0.1), M.steelD, 'conserv');
+  psup.position.set(-tankW/2+0.5, TOP_Y+0.28, -0.35); root.add(psup);
+} else {
+  // ===== 220/500kV：卧式圆筒储油柜 =====
+  consG.position.set(0, TOP_Y+1.3, 1.3);
+  cons = mkMesh(Cyl(0.55,0.55,3.6,28), tankMat, 'conserv', { parent:consG, fault:'oil' });
+  cons.rotation.z = Math.PI/2;
+  [-1.8,1.8].forEach(x=>{
+    const cap = mkMesh(Sph(0.55), tankMat, 'conserv', { parent:consG });
+    cap.scale.x = 0.35; cap.position.x = x;
+  });
+  // 储油柜油位指示（内部油面块，高度随油位变化）
+  consOil = mkMesh(Cyl(0.5,0.5,3.4,24), M.oil, 'gauge', { parent:consG });
+  consOil.rotation.z = Math.PI/2; consOil.scale.set(1,1,0.6);
+  const oGauge = mkMesh(Cyl(0.12,0.12,0.04,18), M.white, 'gauge', { parent:consG });
+  oGauge.position.set(1.85, 0, 0); oGauge.rotation.z = Math.PI/2;
+  // 支撑
+  [-1.2,1.2].forEach(x=>{
+    const sup = mkMesh(Box(0.12,1.1,0.12), M.steelD, 'conserv', { parent:consG });
+    sup.position.set(x,-0.8,-0.2);
+  });
+}
+// 110kV 参考图：左端爬梯 + 顶部走道
+if(SPEC.ladder){
+  const ladX = SPEC.consCylTop ? tankW/2+0.55 : -tankW/2-0.25; // 500kV 爬梯在右端（图1）
+  const ladG = new THREE.Group(); ladG.position.set(ladX, BASE_Y+0.1, 0.7); root.add(ladG);
+  [-0.22,0.22].forEach(z=>{ // 梯柱
+    const rail = mkMesh(Box(0.05, 4.6, 0.05), M.steelD, 'rib', { parent:ladG });
+    rail.position.set(0, 2.3, z);
+  });
+  for(let i=0;i<11;i++){ // 踏步
+    const rung = mkMesh(Box(0.05, 0.04, 0.48), M.steelD, 'rib', { parent:ladG });
+    rung.position.set(0, 0.35+i*0.42, 0);
+  }
+  const plat = mkMesh(Box(0.7, 0.05, 1.1), M.steelD, 'rib', { parent:ladG }); // 顶部走台
+  plat.position.set(SPEC.consCylTop?-0.35:0.35, 4.65, 0);
+}
+// 吸湿器
+const br = mkMesh(Cyl(0.14,0.14,0.5,16), new THREE.MeshPhysicalMaterial({
+  color:0x3366cc, transparent:true, opacity:0.7, roughness:0.2 }), 'breather', { parent:consG });
+br.position.set(SPEC.boxCons? 1.2 : (SPEC.consCylTop? 2.0 : 2.1), -0.85, 0);
+// 连管 + 瓦斯继电器
+const pipe = mkMesh(Cyl(0.09,0.09,1.6,12), tankMat, 'buchholz');
+pipe.rotation.x = Math.PI/2; pipe.position.set(0, TOP_Y+0.5, 0.9); root.add(pipe);
+const buch = mkMesh(Cyl(0.16,0.16,0.42,16), M.red, 'buchholz', { fault:'discharge' });
+buch.rotation.x = Math.PI/2; buch.position.set(0, TOP_Y+0.5, 0.9); root.add(buch);
+// 压力释放阀 + 安全气道
+const prv = mkMesh(Cyl(0.14,0.18,0.35,16), M.steelD, 'prv');
+prv.position.set(-2.4, TOP_Y+0.3, -0.9); root.add(prv);
+prvCap = mkMesh(Cyl(0.2,0.2,0.05,16), M.red, 'prv');
+prvCap.position.set(-2.4, TOP_Y+0.5, -0.9); root.add(prvCap);
+// 温度计表盘 ×2（油温/绕温）
+[[-0.35,'thermo'],[0.25,'thermo']].forEach(([zz,k],i)=>{
+  const th = mkMesh(Cyl(0.14,0.14,0.08,20), M.white, k);
+  const ndl = mkMesh(Box(0.015,0.09,0.01), M.red, k);
+  if(SPEC.white){ // 110kV：表盘装于左端面（正面为散热器）
+    th.rotation.z = Math.PI/2; th.position.set(-tankW/2-0.1, BASE_Y+2.0, zz);
+    ndl.position.set(-tankW/2-0.15, BASE_Y+2.0, zz); ndl.rotation.y = Math.PI/2;
+  } else {
+    th.rotation.x = Math.PI/2; th.position.set(1.4+i*0.5, BASE_Y+2.0, tankD/2+0.1);
+    ndl.position.set(1.4+i*0.5, BASE_Y+2.0, tankD/2+0.15);
+  }
+  th.userData.needle = ndl; root.add(th, ndl);
+  if(i===0) window._oilThermo = ndl; else window._windThermo = ndl;
+});
+
+/* ---------- 8. 有载分接开关 (OLTC) ---------- */
+const oltcG = new THREE.Group(); oltcG.position.set(-tankW/2-0.5, BASE_Y+2.2, 0); root.add(oltcG);
+explodables.push({obj:oltcG, dir:new THREE.Vector3(-2.4,0.5,0), base:null});
+const oltcTank = mkMesh(Cyl(0.45,0.45,2.0,24), SPEC.white? tankMat : M.steelD, 'oltc', { parent:oltcG, fault:'discharge' });
+// 选择开关触头排（内部，可见于剖视）
+for(let i=0;i<9;i++){
+  const ct = mkMesh(Cyl(0.035,0.035,0.18,10), M.brass, 'oltc', { parent:oltcG, fault:'discharge' });
+  const a = i/9*Math.PI*2;
+  ct.position.set(Math.cos(a)*0.28, -0.6+ (i%3)*0.5, Math.sin(a)*0.28);
+}
+// 动触头（切换动画）
+movingContact = mkMesh(Sph(0.07), M.brass, 'oltc', { parent:oltcG, fault:'discharge' });
+movingContact.position.set(0.28, -0.6+0.5, 0);
+// 切换电弧（平时隐藏）
+arc = mkMesh(Sph(0.09), M.arc, null, { parent:oltcG });
+arc.visible = false; arc.position.copy(movingContact.position);
+// 驱动电机
+const motor = mkMesh(Box(0.5,0.5,0.4), M.green, 'oltc', { parent:oltcG });
+motor.position.set(0, 1.5, 0);
+
+/* ---------- 爆炸视图基准 ---------- */
+explodables.forEach(e=>{ e.base = e.obj.position.clone(); });
+
+  // 剖切目标更新 + 特效层回挂
+  clipTargets = [tankWall, lid, oilBody, cons];
+  fxKeep.forEach(o=>root.add(o));
+} // buildModel 结束
+
+buildModel('110'); // 初始构建 110kV SSZ-100000/110（按 TBEA 产品图仿制）
+
+/* =====================================================================
+ * 四、物理仿真内核 v3：电磁-热力耦合 + 保护联动闭环 + 传感器噪声
+ * 状态机：励磁 → 磁通建立 → 电压变换 → 负载输出 → 保护监视
+ * ===================================================================== */
+const S = {
+  // 可调输入
+  vIn:110, load:60, tap:5, nTap:2, amb:25, tspeed:1, paused:false,
+  // 电气量
+  v1:220, v2:35, i1:0, i2:0, freq:50, flux:0, iMag:0,
+  // 热力学量
+  tWind:55, tTop:45, oilLevel:62, lossKW:0,
+  // 保护状态
+  fanOn:false, pumpOn:false, gasLight:false, gasHeavy:false,
+  tripped:false, prvPop:false, tapAnim:0,
+  // 故障注入（内部过热故障场景）
+  faultHeat:0,
+  running:'正常运行',
+  rated:100e3, // 随型号切换（默认 SSZ-100000/110）
+};
+
+// 有载 9 档 ±8×1.25%（简化为 ±5%），无载 3 档 ±2.5%
+function tapRatio(){ return (1+(S.tap-5)*0.0125) * (1+(S.nTap-2)*0.025); }
+// 高斯噪声（±2%，模拟传感器读数波动）
+function gauss(){ let u=0,v=0; while(!u)u=Math.random(); while(!v)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+function noisy(x){ return x*(1+gauss()*0.02); }
+
+function stepPhysics(dt){ // dt: 仿真秒
+  if(S.paused) return;
+  // --- 电磁环节（跳闸后电源切断） ---
+  S.v1 = S.tripped ? 0 : S.vIn;
+  const ratio = (CUR_SPEC.v1/CUR_SPEC.v2)*tapRatio();
+  S.v2 = S.v1/ratio;
+  S.flux = 1.70*(S.v1/CUR_SPEC.v1);
+  S.iMag = 0.6*(S.v1/CUR_SPEC.v1);
+  S.i1 = S.tripped ? 0 : S.rated/(Math.sqrt(3)*CUR_SPEC.v1)*S.load/100;
+  S.i2 = S.tripped ? 0 : S.rated/(Math.sqrt(3)*CUR_SPEC.v2)*S.load/100;
+
+  // --- 损耗：铁损 + 铜损 ∝ β² + 故障附加发热 ---
+  const P0 = CUR_SPEC.pFe||62, PK = CUR_SPEC.pCu||320;   // 空载/负载损耗随型号（500kV 官方：65/481kW）
+  const pFe = P0*Math.pow(S.flux/1.70,2);
+  const pCu = PK*Math.pow(S.load/100,2);
+  S.lossKW = pFe + pCu + S.faultHeat;
+
+  // --- 保护阈值联动（闭环） ---
+  // ① 顶层油温 >55℃ 自动启动冷却风扇与油泵
+  S.fanOn = S.tTop > 55 || S.load >= 80;
+  S.pumpOn = S.fanOn;
+  const coolK = S.fanOn ? 1.9 : 1.0;
+
+  // --- 热力耦合（一阶热模型, IEC 60076-7 思路） ---
+  const tTopTarget  = S.amb + 40*Math.pow(S.lossKW/(P0+PK),0.8)/coolK;
+  const tWindTarget = tTopTarget + 23*Math.pow(S.load/100,1.6)/coolK + S.faultHeat*0.12;
+  const tauTop = 150/coolK, tauWind = 45/coolK;
+  S.tTop  += (tTopTarget -S.tTop )*Math.min(1,dt/tauTop );
+  S.tWind += (tWindTarget-S.tWind)*Math.min(1,dt/tauWind);
+
+  // --- 油位（热膨胀 → 储油柜） ---
+  const lvT = 45+(S.tTop-20)*0.55;
+  S.oilLevel += (THREE.MathUtils.clamp(lvT,18,92)-S.oilLevel)*Math.min(1,dt/120);
+
+  // --- 保护动作逻辑 ---
+  if(S.oilLevel<25 && !S.gasLight){
+    S.gasLight = true;
+    pushAlarm('warn','轻瓦斯动作：油位过低 / 内部产气（集气 ≥250mL）');
+    markFault(['oil'],'油位过低区域');
+  }
+  if(S.tTop>85 && !S._o85){
+    S._o85 = true; pushAlarm('err',`超温告警：顶层油温 ${S.tTop.toFixed(1)}℃ > 85℃`);
+  } else if(S.tTop<80) S._o85 = false;
+  if(S.tWind>105 && !S._w105){
+    S._w105 = true; pushAlarm('err',`绕组温度报警：${S.tWind.toFixed(1)}℃ > 105℃`);
+  } else if(S.tWind<98) S._w105 = false;
+
+  // --- 重瓦斯跳闸（内部放电故障 → 油流骤增 → 断路器跳闸） ---
+  if(S._pendingTrip){
+    S._pendingTrip -= dt;
+    if(S._pendingTrip<=0 && !S.tripped){
+      S.tripped = true; S.gasHeavy = true; S.prvPop = true;
+      pushAlarm('err','重瓦斯动作：油流 >1.0m/s → 断路器跳闸，电源已切断！');
+      pushAlarm('err','压力释放阀动作：内部压力骤增，顶针弹起泄压');
+      toast('⚠ 重瓦斯跳闸！点击工具条「复位」恢复供电');
+      markFault(['discharge'],'内部放电故障点');
+    }
+  }
+
+  // --- 有载分接开关切换动画 ---
+  if(S.tapAnim>0){
+    S.tapAnim -= dt*2.2;
+    const ph = 1-Math.max(0,S.tapAnim);
+    const a0=(tapFrom-1)/9*Math.PI*2, a1=(S.tap-1)/9*Math.PI*2;
+    const a = a0+(a1-a0)*Math.min(1,ph*1.4);
+    movingContact.position.set(Math.cos(a)*0.28, -0.6+((S.tap-1)%3)*0.5, Math.sin(a)*0.28);
+    arc.position.copy(movingContact.position);
+    arc.visible = (ph>0.25&&ph<0.65);
+    arc.scale.setScalar(0.6+Math.random()*0.8);
+    if(S.tapAnim<=0) arc.visible=false;
+  }
+  // 压力释放阀顶针弹起动画
+  const prvTarget = S.prvPop ? 0.22 : 0;
+  prvCap.position.y += (TOP_Y+0.5+prvTarget - prvCap.position.y)*Math.min(1,dt*4);
+  // 温度计指针 / 储油柜油面
+  if(window._oilThermo) window._oilThermo.rotation.z = -Math.PI/4+(S.tTop/120)*Math.PI/2;
+  if(window._windThermo) window._windThermo.rotation.z = -Math.PI/4+(S.tWind/150)*Math.PI/2;
+  if(CUR_SPEC.boxCons||CUR_SPEC.consLong){ consOil.scale.y = THREE.MathUtils.clamp(S.oilLevel/100,0.15,0.95); }
+  else consOil.scale.z = THREE.MathUtils.clamp(S.oilLevel/100,0.15,0.9);
+  // 运行状态字
+  if(S.tripped) S.running='重瓦斯跳闸';
+  else if(S.gasLight) S.running='轻瓦斯报警';
+  else if(S.tTop>85||S.tWind>105) S.running='超温报警';
+  else if(S.load>100) S.running='过载运行';
+  else S.running='正常运行';
+}
+/* ---------- 油循环粒子系统（热虹吸路径） ----------
+   路径：油箱底部 → 绕组间加热上升 → 顶部集油管 → 散热器下行冷却 → 回流底部 */
+const FLOW_N = 900;
+const flowGeo = new THREE.BufferGeometry();
+const flowPos = new Float32Array(FLOW_N*3);
+const flowT   = new Float32Array(FLOW_N);   // 粒子在路径上的参数 0..1
+const flowSpd = new Float32Array(FLOW_N);
+for(let i=0;i<FLOW_N;i++){ flowT[i]=Math.random(); flowSpd[i]=0.6+Math.random()*0.8; }
+flowGeo.setAttribute('position', new THREE.BufferAttribute(flowPos,3));
+const flowMat = new THREE.PointsMaterial({ size:0.07, transparent:true, opacity:0.85,
+  vertexColors:true, depthWrite:false, blending:THREE.AdditiveBlending });
+const flowCols = new Float32Array(FLOW_N*3);
+flowGeo.setAttribute('color', new THREE.BufferAttribute(flowCols,3));
+const flowPts = new THREE.Points(flowGeo, flowMat);
+flowPts.userData.fxKeep = true; root.add(flowPts);
+let flowOn = true;
+
+// 参数 t∈[0,1] → 三维路径坐标（热端红→冷端蓝）
+function flowPath(t, out){
+  // 段1 (0~0.35): 器身内上升（热油）
+  // 段2 (0.35~0.5): 顶部流入散热器
+  // 段3 (0.5~0.85): 散热器内下降冷却
+  // 段4 (0.85~1): 底部回流油箱
+  // 路径随当前机型匹配：110/220 为正面单侧散热器，500 为双侧
+  const W = CUR_SPEC.white;
+  const n = W ? CUR_SPEC.radN : 6;
+  const lane = (Math.floor(t*991)%n);
+  const side = W ? 1 : ((Math.floor(t*997)%2)? 1:-1);
+  const rx = W ? (-(tankW/2-0.5) + lane*((tankW-1.0)/(n-1))) : (-2.5 + lane*1.0);
+  const rz = W ? (tankD/2+0.36) : (tankD/2+0.9);
+  const topY = BASE_Y+2.25 + (W?(CUR_SPEC.consLong?1.75:1.65):1.4);   // 散热器顶
+  const botY = BASE_Y+2.25 - (W?(CUR_SPEC.consLong?1.75:1.65):1.4);   // 散热器底
+  if(t<0.35){
+    const u=t/0.35;
+    const a = t*120;
+    out.set(Math.cos(a)*0.9+([-1.6,0,1.6][lane%3]), botY+u*(topY-botY), Math.sin(a)*0.55);
+  } else if(t<0.5){
+    const u=(t-0.35)/0.15;
+    out.set(THREE.MathUtils.lerp(0,rx,u), topY+0.1+Math.sin(u*Math.PI)*0.2, THREE.MathUtils.lerp(0,side*rz,u));
+  } else if(t<0.85){
+    const u=(t-0.5)/0.35;
+    out.set(rx+(Math.sin(t*200)*0.1), topY-u*(topY-botY), side*rz);
+  } else {
+    const u=(t-0.85)/0.15;
+    out.set(THREE.MathUtils.lerp(rx,0,u), botY, THREE.MathUtils.lerp(side*rz,0,u));
+  }
+  return out;
+}
+const _v = new THREE.Vector3();
+function stepFlow(dt){
+  if(!flowOn){ flowPts.visible=false; return; }
+  flowPts.visible = true;
+  const speed = (0.15 + S.load/100*0.5 + Math.max(0,S.tTop-40)*0.01) * (S.fanOn?1.5:1);
+  const hot = Math.min(1,(S.tTop-25)/60);
+  for(let i=0;i<FLOW_N;i++){
+    flowT[i] += dt*flowSpd[i]*speed*0.08;
+    if(flowT[i]>=1) flowT[i]-=1;
+    flowPath(flowT[i], _v);
+    flowPos[i*3]=_v.x; flowPos[i*3+1]=_v.y; flowPos[i*3+2]=_v.z;
+    // 颜色：上升段偏红(热)、散热器段渐蓝(冷)
+    const heat = flowT[i]<0.5 ? hot : hot*(1-(flowT[i]-0.5)/0.5);
+    flowCols[i*3]  = 0.2+heat*0.9;
+    flowCols[i*3+1]= 0.35+heat*0.25;
+    flowCols[i*3+2]= 0.9-heat*0.75;
+  }
+  flowGeo.attributes.position.needsUpdate = true;
+  flowGeo.attributes.color.needsUpdate = true;
+}
+
+/* ---------- 电磁示意：铁芯磁通线 + 绕组电流脉冲 ---------- */
+const emG = new THREE.Group(); emG.userData.fxKeep = true; root.add(emG); emG.visible = true;
+let emOn = true;
+// 磁通环（闭合磁路沿铁芯矩形回路）
+const fluxLines = [];
+limbX.forEach(x=>{
+  const loop = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.012, 8, 60),
+    new THREE.MeshBasicMaterial({ color:0x66aaff, transparent:true, opacity:0.5 }));
+  loop.position.set(x, coreCY, 0); loop.rotation.x = 0; loop.scale.y = 3.6; loop.scale.z = 0.2;
+  // 竖直拉长表示环绕芯柱的磁通
+  emG.add(loop); fluxLines.push(loop);
+});
+// 绕组电流脉冲点
+const PULSE_N = 60;
+const pulseGeo = new THREE.BufferGeometry();
+const pulsePos = new Float32Array(PULSE_N*3);
+pulseGeo.setAttribute('position', new THREE.BufferAttribute(pulsePos,3));
+const pulses = new THREE.Points(pulseGeo, new THREE.PointsMaterial({
+  color:0xffcc55, size:0.09, transparent:true, opacity:0.9, depthWrite:false,
+  blending:THREE.AdditiveBlending }));
+emG.add(pulses);
+let pulsePh = 0;
+function stepEM(dt, time){
+  if(!emOn){ emG.visible=false; return; }
+  emG.visible = true;
+  const breathe = 0.75 + 0.25*Math.sin(time*6);      // 50Hz 示意性脉动
+  fluxLines.forEach((f,i)=>{
+    f.material.opacity = 0.25 + 0.45*breathe*(S.flux/1.7);
+    f.material.color.setHSL(0.58, 0.9, 0.4+0.25*breathe);
+  });
+  pulsePh += dt*(1+S.load/50);
+  for(let i=0;i<PULSE_N;i++){
+    const limb = limbX[i%3];
+    const ph = (i/PULSE_N + pulsePh*0.25)%1;
+    const a = ph*Math.PI*2*4;                        // 沿螺旋线
+    pulsePos[i*3]  = limb + Math.cos(a)*0.66;
+    pulsePos[i*3+1]= coreCY - 1.4 + ph*2.8;
+    pulsePos[i*3+2]= Math.sin(a)*0.66;
+  }
+  pulseGeo.attributes.position.needsUpdate = true;
+  pulses.material.opacity = 0.4 + 0.5*(S.load/100);
+}
+
+
+/* =====================================================================
+ * 五、数据服务层（Data Service Layer）
+ * 架构：模拟数据源 / 外部接入 → DataStore（观察者模式） → UI展示层
+ * ===================================================================== */
+class DataStore {
+  constructor(){ this._subs = {}; this.data = {}; }
+  /** 订阅数据更新（UI 层注册回调） */
+  subscribe(topic, cb){ (this._subs[topic] ||= []).push(cb); }
+  /** 发布数据快照（数据层调用，≥10Hz） */
+  publish(topic, payload){ this.data[topic]=payload;
+    (this._subs[topic]||[]).forEach(cb=>cb(payload)); }
+}
+const store = new DataStore();
+
+/**
+ * 预留接口：实时运行数据提供者（接入 SCADA / 在线监测时使用）
+ * @interface IRealTimeDataProvider
+ * @function getRuntimeData(): RuntimeData
+ * @function onDataUpdate(callback: (data: RuntimeData)=>void): void
+ * @function switchSource(source: 'simulated'|'realtime'): void
+ */
+/**
+ * 预留接口：油色谱在线监测数据提供者
+ * @interface IDGAProvider
+ * @function getDGAData(): DGAAnalysisResult
+ * @function getDGAHistory(startTime: Date, endTime: Date): DGAAnalysisResult[]
+ * @function onNewSample(callback: (sample: DGAAnalysisResult)=>void): void
+ */
+/** 模拟数据源（Demo 默认）：从仿真内核 S 采样并叠加 ±2% 高斯噪声 */
+const SimulatedProvider = {
+  getRuntimeData(){
+    return {
+      uIn:noisy(S.v1), uOut:noisy(S.v2), iIn:noisy(S.i1), iOut:noisy(S.i2),
+      freq:noisy(S.freq), beta:noisy(S.tripped?0:S.load),
+      tWind:noisy(S.tWind), tTop:noisy(S.tTop), tRise:noisy(S.tTop-S.amb),
+      tAmb:noisy(S.amb), oilMm:noisy(S.oilLevel*13.2),
+      flux:S.flux, oilLevel:S.oilLevel, tap:S.tap, nTap:S.nTap,
+      running:S.running, fanOn:S.fanOn, pumpOn:S.pumpOn,
+      gasLight:S.gasLight, gasHeavy:S.gasHeavy, tripped:S.tripped, prvPop:S.prvPop,
+    };
+  },
+  onDataUpdate(cb){ store.subscribe('runtime', cb); },
+  switchSource(src){ dataSource = src; }
+};
+/** 外部数据接入（预留）：RESTful / WebSocket / CSV / JSON 导入 */
+const ExternalProvider = {
+  getRuntimeData(){ return store.data.runtime || null; },
+  onDataUpdate(cb){ store.subscribe('runtime', cb); },
+  switchSource(src){ dataSource = src; }
+  // TODO-Free 说明：接入真实系统时，在此实现 fetch('/api/rt') 或 new WebSocket(...) 并调用 store.publish('runtime', data)
+};
+let dataSource = 'sim';
+let simTimer = 0;
+function stepDataLayer(dt){
+  simTimer += dt;
+  if(simTimer >= 0.1){                    // ≥10Hz 刷新节拍
+    simTimer = 0;
+    if(dataSource==='sim') store.publish('runtime', SimulatedProvider.getRuntimeData());
+  }
+}
+
+/* =====================================================================
+ * 六、告警中心
+ * ===================================================================== */
+const alarmList = document.getElementById('alarm-list');
+function pushAlarm(level, msg){
+  if(alarmList.querySelector('.alm')?.textContent==='暂无告警') alarmList.innerHTML='';
+  const t = new Date().toTimeString().slice(0,8);
+  const d = document.createElement('div');
+  d.className = 'alm '+level;
+  d.innerHTML = `<span class="t">[${t}]</span>${msg}`;
+  alarmList.prepend(d);
+  while(alarmList.children.length>12) alarmList.lastChild.remove();
+}
+function clearAlarms(){ alarmList.innerHTML='<div class="alm">暂无告警</div>'; }
+window.pushAlarm = pushAlarm;
+
+/* =====================================================================
+ * 七、交互系统：悬浮信息卡 / 三轴剖切 / 爆炸 / 视角 / 故障3D标记
+ * ===================================================================== */
+const tooltip = document.getElementById('tooltip');
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2(-2,-2);
+let hoverObj = null, hoverDirty = false;
+
+// 零件设计标准映射（信息卡引用标准编号）
+const STD_MAP = { core:'GB/T 1094.1-2013', clamp:'GB/T 1094.1-2013', hv:'GB/T 1094.1-2013',
+  lv:'GB/T 1094.1-2013', tapw:'GB/T 1094.1-2013', insul:'GB/T 1094.1-2013',
+  spacer:'GB/T 1094.1-2013', oil:'GB 2536 / DL/T 722-2014', tank:'GB/T 6451',
+  rib:'GB/T 6451', drain:'JB/T 5345', rad:'JB/T 5347', fan:'JB/T 9642', pump:'JB/T 10112',
+  bushH:'GB/T 4109', bushL:'GB/T 4109', oltc:'GB/T 10230.1', buchholz:'DL/T 540',
+  prv:'JB/T 7065', conserv:'JB/T 6484', breather:'JB/T 6484', thermo:'JB/T 8450',
+  gauge:'JB/T 6484', ground:'GB 50169', lead:'GB/T 1094.1-2013', plug:'JB/T 5345' };
+
+addEventListener('pointermove', e=>{
+  pointer.x = (e.clientX/innerWidth)*2-1;
+  pointer.y = -(e.clientY/innerHeight)*2+1;
+  tooltip.style.left = Math.min(innerWidth-360, e.clientX+16)+'px';
+  tooltip.style.top  = Math.min(innerHeight-240, e.clientY+16)+'px';
+  hoverDirty = true;
+});
+
+// 悬浮高亮：按"材质"记录原始自发光（零件共享材质），移出时统一恢复，杜绝残留高亮
+const origEmissive = new Map(); // material -> hex
+function setHover(obj,on){
+  if(!obj?.material?.emissive) return;
+  const mat = obj.material;
+  if(on){
+    if(!origEmissive.has(mat)) origEmissive.set(mat, mat.emissive.getHex());
+    mat.emissive.setHex(0x22d3ee); mat.emissiveIntensity = 0.35;
+  }
+}
+function clearAllHover(){
+  origEmissive.forEach((hex, mat)=>{ mat.emissive.setHex(hex); mat.emissiveIntensity = 1; });
+  origEmissive.clear();
+  if(hoverObj) hoverObj = null;
+  tooltip.style.display = 'none';
+}
+// 指针移出 3D 画布区域时强制清除高亮
+renderer.domElement.addEventListener('pointerleave', clearAllHover);
+function updateHover(){
+  raycaster.setFromCamera(pointer,camera);
+  const hits = raycaster.intersectObjects(pickables,false);
+  const hit = hits[0];
+  if(!hit){ clearAllHover(); return; }
+  if(hoverObj && hit.object!==hoverObj) clearAllHover();
+  {
+    hoverObj = hit.object; setHover(hoverObj,true);
+    const info = PART_INFO[hoverObj.userData.key];
+    if(info){
+      const faultTag = hoverObj.userData.faultMark
+        ? `<div class="tt-row tt-fault">⚠ ${hoverObj.userData.faultMark}</div>`:'';
+      tooltip.innerHTML = `<div class="tt-name">${info.name}</div>
+        <div class="tt-en">${info.en}</div>
+        <div class="tt-row"><b>材料：</b>${info.material}</div>
+        <div class="tt-row"><b>功能：</b>${info.func}</div>
+        <div class="tt-row"><b>关键参数：</b>${info.params}</div>
+        <div class="tt-row"><b>当前状态：</b><span class="tt-state">${info.state()}</span></div>
+        ${faultTag}
+        <div class="tt-std">设计依据：${STD_MAP[hoverObj.userData.key]||'GB/T 1094.1-2013'} / DL/T 722-2014</div>`;
+      tooltip.style.display='block';
+    }
+  }
+}
+
+/* ---------- 三轴剖切（X/Y/Z 位置滑块，醒目轮廓标示） ---------- */
+const planeX = new THREE.Plane(new THREE.Vector3(-1,0,0), 0);
+const planeY = new THREE.Plane(new THREE.Vector3(0,-1,0), 0);
+const planeZ = new THREE.Plane(new THREE.Vector3(0,0,-1), 0);
+let clipOn = false;
+const clipPos = { x:0, y:0, z:0.2 };
+const clipHelpers = [];
+function mkClipHelper(axis){
+  const g = new THREE.Group();
+  const geo = new THREE.PlaneGeometry(12,12);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+    color:0xff5533, transparent:true, opacity:0.05, side:THREE.DoubleSide, depthWrite:false }));
+  const edge = new THREE.LineLoop(new THREE.EdgesGeometry(geo),
+    new THREE.LineBasicMaterial({ color:0xff5533 }));
+  g.add(mesh, edge);
+  if(axis==='x') g.rotation.y = Math.PI/2;
+  if(axis==='z') g.rotation.x = Math.PI/2;
+  g.visible = false; scene.add(g);
+  clipHelpers.push({ axis, g });
+  return g;
+}
+mkClipHelper('x'); mkClipHelper('y'); mkClipHelper('z');
+const clipMats = new Map();
+function activeClipPlanes(){
+  if(!clipOn) return null;
+  const ps = [];
+  if(clipPos.x>0.01){ planeX.constant = clipPos.x; ps.push(planeX); }
+  if(clipPos.y>0.01){ planeY.constant = clipPos.y; ps.push(planeY); }
+  if(clipPos.z>0.01){ planeZ.constant = clipPos.z; ps.push(planeZ); }
+  return ps.length ? ps : [planeX]; // 开关打开但无位移时给默认 X=0 截面
+}
+function applyClip(){
+  const planes = activeClipPlanes();
+  clipTargets.forEach(m=>{
+    if(planes){
+      if(!clipMats.has(m)){
+        const cm = m.material.clone(); clipMats.set(m,{orig:m.material,clip:cm});
+      }
+      clipMats.get(m).clip.clippingPlanes = planes;
+      m.material = clipMats.get(m).clip;
+    } else if(clipMats.has(m)) m.material = clipMats.get(m).orig;
+  });
+  clipHelpers.forEach(({axis,g})=>{
+    if(!clipOn || clipPos[axis]<0.01){ g.visible=false; return; }
+    g.visible = true;
+    if(axis==='x') g.position.set(clipPos.x, 6, 0);
+    if(axis==='y') g.position.set(0, clipPos.y, 0);
+    if(axis==='z') g.position.set(0, 6, clipPos.z);
+  });
+  const tb = document.querySelector('[data-t="clip"]');
+  tb && tb.classList.toggle('on', clipOn);
+  const sw = document.getElementById('clip-sw');
+  sw && sw.classList.toggle('on', clipOn);
+}
+function toggleClip(){ clipOn=!clipOn; applyClip(); toast(clipOn?'剖视模式已开启':'剖视模式已关闭'); }
+window.toggleClip = toggleClip;
+
+/* ---------- 爆炸视图 ---------- */
+let explodeTarget = 0, explodeT = 0;
+function toggleExplode(){
+  explodeTarget = explodeTarget?0:1;
+  const tb = document.querySelector('[data-t="explode"]');
+  tb && tb.classList.toggle('on', !!explodeTarget);
+  toast(explodeTarget?'爆炸视图：展示装配层级':'爆炸视图：复位装配');
+}
+window.toggleExplode = toggleExplode;
+function stepExplode(dt){
+  explodeT += (explodeTarget-explodeT)*Math.min(1,dt*3);
+  if(Math.abs(explodeTarget-explodeT)<0.001 && explodeT===explodeTarget) return;
+  explodables.forEach(e=>e.obj.position.copy(e.base).addScaledVector(e.dir,explodeT));
+}
+
+/* ---------- 视角预设 ---------- */
+const VIEWS = {
+  free:{p:[15,10,17],t:[0,4.2,0]}, top:{p:[0.1,27,0.1],t:[0,2,0]},
+  side:{p:[0,4.5,21],t:[0,4.2,0]}, section:{p:[21,4.5,0],t:[0,4.2,0]},
+  inner:{p:[3.4,4.6,3.4],t:[0,3.0,0]},
+};
+let viewAnim = null;
+function setView(name){
+  const v = VIEWS[name]; if(!v) return;
+  viewAnim = { p0:camera.position.clone(), t0:controls.target.clone(),
+    p1:new THREE.Vector3(...v.p), t1:new THREE.Vector3(...v.t), k:0 };
+  if((name==='inner'||name==='section') && !clipOn){ clipOn=true; applyClip(); }
+}
+window.setView = setView;
+function stepView(dt){
+  if(!viewAnim) return;
+  viewAnim.k = Math.min(1, viewAnim.k+dt*1.6);
+  const e = 1-Math.pow(1-viewAnim.k,3);
+  camera.position.lerpVectors(viewAnim.p0,viewAnim.p1,e);
+  controls.target.lerpVectors(viewAnim.t0,viewAnim.t1,e);
+  if(viewAnim.k>=1) viewAnim=null;
+}
+
+/* ---------- 故障 3D 标记（红色脉冲光环 + 火花粒子） ---------- */
+const faultMarkers = [];
+let sparkPts = null;
+function clearFaultMarks(){
+  faultMarkers.forEach(m=>{ scene.remove(m); m.geometry.dispose(); m.material.dispose(); });
+  faultMarkers.length = 0;
+  if(sparkPts){ scene.remove(sparkPts); sparkPts.geometry.dispose(); sparkPts.material.dispose(); sparkPts=null; }
+  Object.values(FAULT_PARTS).flat().forEach(o=>{ delete o.userData.faultMark; });
+}
+window.clearFaultMarks = clearFaultMarks;
+function markFault(zones,label){
+  clearFaultMarks();
+  const sparkPos = [];
+  zones.forEach(z=>{
+    FAULT_PARTS[z].forEach(o=>{
+      o.userData.faultMark = label;
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.4,0.03,10,40),
+        new THREE.MeshBasicMaterial({ color:0xff3333, transparent:true, opacity:0.9 }));
+      const wp = new THREE.Vector3(); o.getWorldPosition(wp);
+      ring.position.copy(wp); ring.userData.isRing = true;
+      scene.add(ring); faultMarkers.push(ring);
+      // 放电类故障附加火花粒子
+      if(z==='discharge'||z==='partial'){
+        for(let i=0;i<24;i++) sparkPos.push(
+          wp.x+(Math.random()-0.5)*0.7, wp.y+(Math.random()-0.5)*0.9, wp.z+(Math.random()-0.5)*0.7);
+      }
+    });
+  });
+  if(sparkPos.length){
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(sparkPos),3));
+    sparkPts = new THREE.Points(g, new THREE.PointsMaterial({ color:0xffaa33, size:0.07,
+      transparent:true, opacity:0.95, depthWrite:false, blending:THREE.AdditiveBlending }));
+    sparkPts.userData.isSpark = true;
+    scene.add(sparkPts); faultMarkers.push(sparkPts);
+  }
+}
+window.markFault = markFault;
+function stepFaultMarkers(t){
+  faultMarkers.forEach((m,i)=>{
+    if(m.userData.isRing){ m.scale.setScalar(1+0.25*Math.sin(t*5+i));
+      m.material.opacity = 0.5+0.4*Math.sin(t*5+i); m.lookAt(camera.position); }
+    else if(m.userData.isSpark){ m.material.opacity = 0.4+0.55*Math.abs(Math.sin(t*9));
+      m.rotation.y = Math.sin(t*2)*0.1; }
+  });
+}
+
+/* ---------- 提示条 ---------- */
+let toastTimer = null;
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.style.display='block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.style.display='none', 2800);
+}
+window.toast = toast;
+
+/* =====================================================================
+ * 八、油色谱智能诊断 v3 —— 改良三比值法（DL/T 722-2014）
+ *   R1 = C₂H₂/C₂H₄ ｜ R2 = CH₄/H₂ ｜ R3 = C₂H₄/C₂H₆ ｜ 编码 (R1,R2,R3)
+ *   分母为零处理：0/0→缺码N/A(启用Duval备用) ｜ x/0→编码3
+ * ===================================================================== */
+const GASES = ['H2','CH4','C2H6','C2H4','C2H2','CO','CO2'];
+const GAS_CN = { H2:'H₂（氢气）', CH4:'CH₄（甲烷）', C2H6:'C₂H₆（乙烷）',
+  C2H4:'C₂H₄（乙烯）', C2H2:'C₂H₂（乙炔）', CO:'CO（一氧化碳）', CO2:'CO₂（二氧化碳）' };
+
+// 生成气体浓度表
+{
+  const tb = document.getElementById('gas-table');
+  GASES.forEach(g=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${GAS_CN[g]}</td>
+      <td style="text-align:right"><input type="number" min="0" step="0.1" value="0" id="gas-${g}"> μL/L</td>`;
+    tb.appendChild(tr);
+  });
+}
+function readGases(){
+  const d = {};
+  GASES.forEach(g=>{
+    const el = document.getElementById('gas-'+g);
+    d[g] = Math.max(0, parseFloat(el.value)||0);
+    el.classList.toggle('zero', d[g]===0);
+  });
+  return d;
+}
+function setGases(d){ GASES.forEach(g=>{ if(d[g]!==undefined) document.getElementById('gas-'+g).value=d[g]; }); }
+window.setGases = setGases;
+
+/* ---------- 预设色谱样本（5组典型样本，自动填入） ---------- */
+const DGA_PRESETS = {
+  // 预设样本与三比值编码严格对应：
+  // normal→(0,0,0)正常运行 ｜ lowheat→(0,2,0)低温过热 ｜ highheat→(0,2,2)高温过热
+  // hidis→(2,0,0)电弧放电 ｜ mix→(1,1,2)低能放电兼过热
+  normal:  { H2:80,  CH4:6,   C2H6:25,  C2H4:2,   C2H2:0.1, CO:150,  CO2:1200 },
+  lowheat: { H2:90,  CH4:170, C2H6:300, C2H4:25,  C2H2:0.5, CO:420,  CO2:2900 },
+  highheat:{ H2:130, CH4:310, C2H6:80,  C2H4:165, C2H2:1.5, CO:520,  CO2:3400 },
+  hidis:   { H2:520, CH4:42,  C2H6:300, C2H4:22,  C2H2:38,  CO:180,  CO2:1500 },
+  mix:     { H2:200, CH4:100, C2H6:40,  C2H4:80,  C2H2:40,  CO:600,  CO2:3900 },
+};
+
+/* ---------- 比值计算（含分母为零特殊处理） ---------- */
+function ratioEx(num, den, name){
+  if(den===0){
+    if(num===0) return { v:null, code:'NA', name,
+      note:`${name}：分母分子均为 0 → 缺码 N/A` };
+    return { v:Infinity, code:3, name,
+      note:`${name}：分母为 0、分子>0，比值→∞ → 依导则精神编码 3` };
+  }
+  const v = num/den;
+  const code = v<0.1 ? 0 : v<1 ? 1 : v<3 ? 2 : 3;
+  return { v, code, name, note:`${name} = ${v.toFixed(2)} → ${code}` };
+}
+
+/* ---------- 故障类型匹配表（国家能源局三比值编码表，编码顺序 R1=C₂H₂/C₂H₄, R2=CH₄/H₂, R3=C₂H₄/C₂H₆） ---------- */
+const FAULT_TABLE = {
+  '000':{ type:'正常运行 / 无明显故障', detail:'各特征气体浓度及产气速率均在注意值以下，无异常趋势（正常状态的标准编码）', zone:[], conf:95 },
+  '001':{ type:'低温过热（低于150℃）', detail:'绝缘导线过热或引线松动接触不良引起的低温热故障', zone:['overheat'], conf:85 },
+  '020':{ type:'低温过热（150℃~300℃）', detail:'铁芯局部过热或分接开关接触不良', zone:['overheat'], conf:85 },
+  '021':{ type:'中温过热（300℃~700℃）', detail:'铁芯多点接地或内部局部短路', zone:['overheat'], conf:88 },
+  '022':{ type:'高温过热（高于700℃）', detail:'油箱或铁芯中存在较大的循环电流，或硅钢片短路', zone:['overheat'], conf:90 },
+  '100':{ type:'局部放电', detail:'绝缘材料中存在气隙或空穴导致的放电', zone:['partial'], conf:82 },
+  '101':{ type:'低能放电', detail:'油膜闪络、悬浮电位放电', zone:['discharge'], conf:85 },
+  '102':{ type:'低能放电', detail:'油膜闪络、悬浮电位放电（标准将此编码也归为低能放电）', zone:['discharge'], conf:83 },
+  '111':{ type:'非编码组合 / 需综合判断', detail:'标准编码中无对应故障类型，可能指示复合故障或正常老化，需结合浓度趋势、电气试验等综合判断', zone:[], conf:50 },
+  '112':{ type:'低能放电兼过热', detail:'低能放电与局部过热同时存在', zone:['discharge','overheat'], conf:82 },
+  '200':{ type:'电弧放电', detail:'绕组间或层间短路、电弧放电', zone:['discharge'], conf:92 },
+  '201':{ type:'电弧放电', detail:'绕组间或层间短路、电弧放电（标准归为电弧放电）', zone:['discharge'], conf:92 },
+  '202':{ type:'电弧放电兼过热', detail:'电弧放电伴随过热现象', zone:['discharge','overheat'], conf:90 },
+  '210':{ type:'低能放电兼过热', detail:'低能放电与局部过热同时存在', zone:['discharge','overheat'], conf:82 },
+  '211':{ type:'低能放电兼过热', detail:'低能放电与局部过热同时存在', zone:['discharge','overheat'], conf:82 },
+  '212':{ type:'低能放电兼过热', detail:'低能放电与局部过热同时存在', zone:['discharge','overheat'], conf:82 },
+  '220':{ type:'电弧放电兼过热', detail:'电弧放电伴随过热现象', zone:['discharge','overheat'], conf:90 },
+  '221':{ type:'电弧放电兼过热', detail:'电弧放电伴随过热现象', zone:['discharge','overheat'], conf:90 },
+  '222':{ type:'电弧放电兼过热', detail:'电弧放电伴随过热现象', zone:['discharge','overheat'], conf:90 },
+};
+const ZONE_LABEL = { overheat:'铁芯 / 绕组区域（红色脉冲光环）',
+  discharge:'引线 / 分接开关区域（火花粒子）', partial:'绝缘纸板 / 绕组端部',
+  oil:'油箱 / 储油柜油系统' };
+
+/* ---------- 大卫三角法（Duval Triangle 1）备用诊断 ----------
+ * %CH4 = CH4/(CH4+C2H4+C2H2)×100，%C2H4、%C2H2 同理，按区域判定 */
+function duvalCalc(ch4, c2h2, c2h4){
+  const sum = ch4+c2h2+c2h4;
+  if(sum<=0) return null;
+  const pC = ch4/sum*100, pA = c2h2/sum*100, pE = c2h4/sum*100;
+  let zone, type, conf=78;
+  if(pC>=98)                                            { zone='PD'; type='电晕/局部放电'; }
+  else if(pA>=13 && pE<=23 && pA>=2*pE)                 { zone='D1'; type='低能放电'; }
+  else if(pA>29 || (pA>13&&pE>23))                      { zone='D2'; type='高能放电（电弧）'; conf=80; }
+  else if(pE<=20 && pC>50)                              { zone='T1'; type='低温过热 (<300℃)'; conf=76; }
+  else if(pE>20 && pE<=50)                              { zone='T2'; type='中温过热 (300~700℃)'; }
+  else if(pE>50)                                        { zone='T3'; type='高温过热 (>700℃)'; conf=80; }
+  else                                                  { zone='DT'; type='过热兼放电混合'; conf=70; }
+  return { zone, type, conf, pC, pA, pE };
+}
+function duvalZoneToParts(z){
+  return (z==='D1'||z==='D2') ? ['discharge'] : z==='PD' ? ['partial'] : ['overheat'];
+}
+function fuzzyByValues(g){
+  if(g.C2H2>5) return { type:'放电性故障（乙炔显著）', zone:['discharge'], conf:65 };
+  if(g.C2H4>50&&g.CH4>50) return { type:'过热性故障（CH₄+C₂H₄ 主导）', zone:['overheat'], conf:65 };
+  if(g.H2>100) return { type:'疑似局部放电/受潮（H₂ 主导）', zone:['partial'], conf:60 };
+  return { type:'无法明确分类，建议跟踪复测', zone:[], conf:40 };
+}
+
+/* ---------- Duval 三角形可视化（逐像素按分类函数着色，分区与判定严格一致） ---------- */
+const duvalCv = document.getElementById('duval-cv');
+const DUVAL_COLORS = { PD:'#64748b', D1:'#a855f7', D2:'#3b82f6', T1:'#ef4444',
+                       T2:'#ec4899', T3:'#f59e0b', DT:'#84cc16' };
+// 与 duvalCalc 完全一致的区域判别（仅返回区域名）
+function duvalZoneOf(pC, pE, pA){
+  if(pC>=98) return 'PD';
+  if(pA>=13 && pE<=23 && pA>=2*pE) return 'D1';
+  if(pA>29 || (pA>13 && pE>23)) return 'D2';
+  if(pE<=20 && pC>50) return 'T1';
+  if(pE>20 && pE<=50) return 'T2';
+  if(pE>50) return 'T3';
+  return 'DT';
+}
+let duvalLayer = null, duvalLayerKey = '';
+function drawDuval(p){ // p: {pC,pA,pE} 或 null
+  const dpr = Math.min(devicePixelRatio||1, 2);
+  const W = duvalCv.clientWidth, H = duvalCv.clientHeight;
+  duvalCv.width = W*dpr; duvalCv.height = H*dpr;
+  const c = duvalCv.getContext('2d'); c.scale(dpr,dpr);
+  c.fillStyle = '#06101f'; c.fillRect(0,0,W,H);
+  const m = 26, tw = W-2*m, th = H-2*m;
+  const top = m, y0 = top;
+  // 重心坐标 → 直角坐标（顶=%CH4，左下=%C2H4，右下=%C2H2）
+  const P = (pc,pe,pa)=>[ m + (pa + pc*0.5)/100*tw, y0 + (1-pc/100)*th ];
+  const A = P(100,0,0), B = P(0,100,0), C = P(0,0,100);
+  // 区域着色层（离屏缓存，尺寸变化时重算）
+  const key = W+'x'+H;
+  if(duvalLayerKey!==key){
+    duvalLayerKey = key;
+    duvalLayer = document.createElement('canvas');
+    duvalLayer.width = W; duvalLayer.height = H;
+    const lc = duvalLayer.getContext('2d');
+    const step = 2;
+    for(let py=0; py<H; py+=step){
+      for(let px=0; px<W; px+=step){
+        // 直角坐标 → 重心坐标
+        const pc = (1-(py-y0)/th)*100;
+        const u  = (px-m)/tw;
+        const pa = (u - pc/200)*100;
+        const pe = 100-pc-pa;
+        if(pc<0||pe<0||pa<0) continue;
+        lc.fillStyle = DUVAL_COLORS[duvalZoneOf(pc,pe,pa)];
+        lc.globalAlpha = 0.38;
+        lc.fillRect(px,py,step,step);
+      }
+    }
+    // 区域边界羽化描边（沿颜色交界）
+    lc.globalAlpha = 1;
+  }
+  c.drawImage(duvalLayer, 0, 0, W, H);
+  // 区域名称标签（锚点位于各自区域内部）
+  const anchors = { PD:[99,0.5,0.5], D1:[72,14,14], D2:[24,12,64], T1:[76,16,8],
+                    T2:[44,36,20], T3:[12,72,16], DT:[38,44,18] };
+  c.font = 'bold 10px sans-serif'; c.textAlign = 'center';
+  Object.entries(anchors).forEach(([n,[pc,pe,pa]])=>{
+    const [x,y] = P(pc,pe,pa);
+    c.fillStyle = '#06101fcc'; c.fillText(n, x+0.8, y+3.8);   // 描影
+    c.fillStyle = '#e8f2ff'; c.fillText(n, x, y+3);
+  });
+  // 外框与轴标签
+  c.beginPath(); c.moveTo(...A); c.lineTo(...B); c.lineTo(...C); c.closePath();
+  c.strokeStyle = '#7dd3fc'; c.lineWidth = 1.4; c.stroke();
+  c.fillStyle = '#6f8db0'; c.font = '10px sans-serif';
+  c.fillText('%CH₄', A[0], A[1]-8);
+  c.fillText('%C₂H₄', B[0]-14, B[1]+14);
+  c.fillText('%C₂H₂', C[0]+14, C[1]+14);
+  // 采样点（当前诊断样本落点）
+  if(p){
+    const [x,y] = P(p.pC, p.pE, p.pA);
+    c.beginPath(); c.arc(x,y,6,0,7); c.fillStyle='#22e584'; c.fill();
+    c.strokeStyle='#fff'; c.lineWidth=1.4; c.stroke();
+    c.beginPath(); c.arc(x,y,10,0,7); c.strokeStyle='#22e58488'; c.lineWidth=1; c.stroke();
+    c.fillStyle='#22e584'; c.font='9px Consolas';
+    c.fillText(`CH₄${p.pC.toFixed(0)} C₂H₄${p.pE.toFixed(0)} C₂H₂${p.pA.toFixed(0)}`, x, y+22);
+  }
+}
+
+/* ---------- 主诊断流程 ---------- */
+let lastDuval = null;
+function diagnose(){
+  const g = readGases();
+  const R1 = ratioEx(g.C2H2, g.C2H4, 'R1=C₂H₂/C₂H₄');
+  const R2 = ratioEx(g.CH4,  g.H2,   'R2=CH₄/H₂');
+  const R3 = ratioEx(g.C2H4, g.C2H6, 'R3=C₂H₄/C₂H₆');
+  // 比值表 UI
+  const fmt = r=> r.code==='NA' ? 'N/A（缺码）' : (r.v===Infinity?'∞ → 3':`${r.v.toFixed(2)} → ${r.code}`);
+  document.getElementById('r1-v').textContent = fmt(R1);
+  document.getElementById('r2-v').textContent = fmt(R2);
+  document.getElementById('r3-v').textContent = fmt(R3);
+  const na = [R1,R2,R3].filter(r=>r.code==='NA');
+  const codeArr = [R1,R2,R3].map(r=>r.code==='NA'?'N':r.code);
+  const codeStr = codeArr.join('');
+  const digits = document.getElementById('code-digits');
+  digits.textContent = codeArr.join(' , ');
+  digits.classList.toggle('na', na.length>0);
+
+  let result, method='改良三比值法', extra='';
+  if(na.length===0){
+    result = FAULT_TABLE[codeStr];
+    if(!result){
+      const du = duvalCalc(g.CH4, g.C2H2, g.C2H4);
+      result = du ? { type:du.type, conf:du.conf-4, zone:duvalZoneToParts(du.zone),
+          detail:`编码 (${codeArr.join(',')}) 无精确匹配，大卫三角复核定位于 ${du.zone} 区` }
+        : { type:'编码无匹配，建议复测', zone:[], conf:40, detail:'' };
+      method = '三比值法 + 大卫三角复核';
+    }
+    lastDuval = duvalCalc(g.CH4, g.C2H2, g.C2H4);
+  } else {
+    // 缺码 → 备用诊断机制：Duval Triangle
+    const du = duvalCalc(g.CH4, g.C2H2, g.C2H4);
+    if(du){
+      method = '备用诊断机制：Duval Triangle 结果';
+      result = { type:du.type, conf:du.conf, zone:duvalZoneToParts(du.zone),
+        detail:`%CH₄=${du.pC.toFixed(1)} %C₂H₄=${du.pE.toFixed(1)} %C₂H₂=${du.pA.toFixed(1)} → ${du.zone} 区` };
+      lastDuval = du;
+    } else {
+      method = '备用诊断机制：无编码比值模糊判断';
+      result = fuzzyByValues(g); lastDuval = null;
+    }
+    const zeros = GASES.filter(x=>g[x]===0).map(x=>GAS_CN[x]).join('、');
+    extra = `\n⚠ 缺码 ${na.length} 项（零值气体：${zeros||'无'}），建议重新取样复测以提高置信度。`;
+  }
+  drawDuval(lastDuval);
+
+  const conf = Math.min(97, result.conf);
+  const el = document.getElementById('diag-conclusion');
+  const cls = /高能|电弧/.test(result.type) ? 'err' : /正常/.test(result.type) ? 'ok' : 'warn';
+  el.className = cls;
+  el.innerHTML = `<span class="big">${result.type}</span>（置信度 ≥${conf}%）
+方法：${method}
+依据标准：DL/T 722-2014
+${result.detail||''}${extra}
+${result.zone?.length ? '3D定位：'+result.zone.map(z=>ZONE_LABEL[z]).join('；') : ''}
+建议：${recommend(result.type)}`;
+
+  // 3D 故障定位联动
+  if(result.zone?.length){
+    markFault(result.zone, `疑似${result.type}`);
+    if(/高能|电弧/.test(result.type) && !S.tripped && !S._pendingTrip){
+      // 高能放电 → 产气激增 → 延时触发重瓦斯跳闸与压力释放阀
+      S.gasLight = true;
+      pushAlarm('warn','轻瓦斯动作：内部故障产气积聚（色谱联动）');
+      S._pendingTrip = 3;
+    }
+  } else clearFaultMarks();
+
+  saveHistory(g);
+  return result;
+}
+window.diagnose = diagnose;
+
+function recommend(type){
+  if(/高能|电弧/.test(type)) return '立即停运，电气试验+油中复测，检查绕组/引线/分接开关，必要时吊罩检查';
+  if(type.includes('低能')) return '缩短色谱周期至每周，检查分接开关触头与接地回路，安排停电试验';
+  if(type.includes('放电')||type.includes('电晕')) return '检测油中微水与介损，局放在线监测，排查绝缘受潮与气泡';
+  if(type.includes('高温')) return '红外测温+负荷核查，检查铁芯接地电流与油路堵塞，限负荷运行';
+  if(/中温|低温/.test(type)) return '加强色谱跟踪（每月），核对冷却器运行与负载率';
+  if(type.includes('正常')) return '维持正常监测周期（3个月），关注趋势变化';
+  return '建议复测并结合电气试验综合判断';
+}
+
+/* ---------- 历史趋势（localStorage 持久化） ---------- */
+let history = JSON.parse(localStorage.getItem('dga_hist')||'[]');
+function saveHistory(g){
+  history.push({ t:Date.now(), ...g });
+  if(history.length>50) history = history.slice(-50);
+  localStorage.setItem('dga_hist', JSON.stringify(history));
+}
+
+/* ---------- CSV / JSON 导入 ---------- */
+function applyDgaRow(row){
+  const g = {};
+  GASES.forEach(k=>{
+    const kk = Object.keys(row).find(key=>key.toUpperCase().replace(/[^A-Z0-9]/g,'')===k);
+    g[k] = kk ? Math.max(0,parseFloat(row[kk])||0) : 0;
+  });
+  return g;
+}
+document.getElementById('csv-file').addEventListener('change', ev=>{
+  const f = ev.target.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = ()=>{
+    const lines = rd.result.split(/\r?\n/).filter(l=>l.trim());
+    if(lines.length<2){ toast('CSV 无有效数据行'); return; }
+    const head = lines[0].split(/[,，\t]/).map(s=>s.trim());
+    let n = 0;
+    lines.slice(1).forEach(l=>{
+      const c = l.split(/[,，\t]/);
+      const row = {}; head.forEach((h,i)=>row[h]=c[i]);
+      const g = applyDgaRow(row);
+      if(GASES.some(k=>g[k]>0)){ saveHistory(g); setGases(g); n++; }
+    });
+    if(n){ diagnose(); toast(`CSV 导入成功：${n} 组，最后一组已载入诊断`); }
+    else toast('CSV 解析失败：表头需含 H2,CH4,C2H6,C2H4,C2H2,CO,CO2');
+  };
+  rd.readAsText(f); ev.target.value='';
+});
+document.getElementById('json-file').addEventListener('change', ev=>{
+  const f = ev.target.files[0]; if(!f) return;
+  const rd = new FileReader();
+  rd.onload = ()=>{
+    try{
+      const j = JSON.parse(rd.result);
+      const arr = Array.isArray(j) ? j : (j.samples || j.data || [j]);
+      let n = 0;
+      arr.forEach(row=>{
+        const g = applyDgaRow(row);
+        if(GASES.some(k=>g[k]>0)){ saveHistory(g); setGases(g); n++; }
+      });
+      if(n){ diagnose(); toast(`JSON 导入成功：${n} 组，最后一组已载入诊断`); }
+      else toast('JSON 中未找到气体浓度字段');
+    }catch(e){ toast('JSON 解析失败：'+e.message); }
+  };
+  rd.readAsText(f); ev.target.value='';
+});
+
+/* ---------- 数据源切换控件 ---------- */
+document.getElementById('dsrc-sel').addEventListener('change', e=>{
+  dataSource = e.target.value==='ext' ? 'ext' : 'sim';
+  document.getElementById('src-badge').textContent = dataSource==='sim'?'模拟数据':'外部接入';
+  document.getElementById('ext-status').textContent = dataSource==='ext'?'等待数据流...':'未启用';
+  toast(dataSource==='ext'?'已切换至外部接入：等待数据流（RESTful/WebSocket 预留接口）':'已切换回模拟数据源');
+});
+
+/* =====================================================================
+ * 九、运行工况场景 / UI 接线 / 实时曲线 / 主循环 / 性能保底
+ * ===================================================================== */
+const $ = id=>document.getElementById(id);
+
+/* ---------- 运行工况场景（下拉切换，经数据服务层生效） ---------- */
+function setSlider(id,v){ const el=$(id); el.value=v; el.dispatchEvent(new Event('input')); }
+function applyScenario(name){
+  S.faultHeat = 0; S._pendingTrip = 0;
+  if(name==='routine'){ setSlider('load',60);
+    toast('工况：日常常规运行（40%~80% 区间，兼顾效率、电网安全冗余与设备寿命）'); }
+  if(name==='light'){ setSlider('load',8);
+    toast('工况：轻载/空载运行（<30%，安全但单位电能损耗占比较高）'); }
+  if(name==='rated'){ setSlider('load',100); toast('工况：额定负载运行（100%）'); }
+  if(name==='overload'){ setSlider('load',130);
+    pushAlarm('warn','短时过载运行（130%）：受油温/绕温限制，允许分钟~小时级');
+    toast('工况：短时过载运行（110%~130%，油温持续上升，时间受严格限制）'); }
+  if(name==='overheat'){
+    setSlider('load',100); S.faultHeat = 260;
+    toast('工况：内部过热故障，温度急剧攀升');
+    markFault(['overheat'],'内部过热故障点');
+    pushAlarm('warn','内部过热故障：绕组损耗异常增大');
+  }
+  if(name==='discharge'){
+    setSlider('load',100); S.gasLight = true; S._pendingTrip = 3;
+    document.getElementById('dga-preset').value='hidis';
+    setGases(DGA_PRESETS.hidis); diagnose();
+    pushAlarm('warn','轻瓦斯动作：内部放电产气积聚');
+    toast('工况：内部放电故障，保护即将动作');
+  }
+  if(['routine','light','rated','overload'].includes(name)) clearFaultMarks();
+}
+$('scenario').addEventListener('change', e=>applyScenario(e.target.value));
+
+/* ---------- 参数滑块 ---------- */
+let tapFrom = 5;
+/* ---------- 模型族切换（TBEA 110/220/500kV） ---------- */
+function updateModelInfo(){
+  const sp = CUR_SPEC;
+  $('model-info').innerHTML =
+    `<div class="kv"><span class="k">型号</span><span class="v" style="color:var(--cyan)">${sp.name}</span></div>`+
+    `<div class="kv"><span class="k">额定容量</span><span class="v">${sp.mva} MVA</span></div>`+
+    `<div class="kv"><span class="k">电压比</span><span class="v">${sp.ratio} kV</span></div>`+
+    `<div class="kv"><span class="k">接线组别</span><span class="v">${sp.group}</span></div>`+
+    `<div class="kv"><span class="k">冷却方式</span><span class="v">${sp.cool}</span></div>`+
+    `<div class="kv"><span class="k">结构特点</span><span class="v" style="font-size:11px">${sp.feat}</span></div>`;
+}
+$('model-sel').addEventListener('change', e=>{
+  const spec = MODEL_SPECS[e.target.value];
+  buildModel(e.target.value);
+  clipMats.clear();          // 剖切材质缓存随新模型重建
+  if(clipOn) applyClip();
+  // 电气参数同步新额定值
+  S.rated = spec.mva*1000; S.vIn = spec.v1;
+  const sl = $('in-volt');
+  sl.min = spec.vMin; sl.max = spec.vMax; sl.value = spec.v1;
+  $('in-volt-v').textContent = spec.v1+'kV';
+  updateModelInfo(); clearAllHover(); clearFaultMarks();
+  toast(`模型已切换：${spec.name}（${spec.desc}）`);
+});
+updateModelInfo();
+
+function bindSlider(id,key,unit,fmt){
+  const el=$(id), lab=$(id+'-v');
+  el.addEventListener('input',()=>{
+    const v=parseFloat(el.value);
+    S[key]=v;
+    lab.textContent = fmt? v.toFixed(1)+unit : Math.round(v)+unit;
+  });
+}
+bindSlider('in-volt','vIn','kV');
+bindSlider('load','load','%');
+bindSlider('amb','amb','℃');
+bindSlider('tspeed','tspeed','x',true);
+
+/* ---------- 分接开关 +/-（有载动作动画 / 无载需停电） ---------- */
+function oltcTo(nv){
+  nv = THREE.MathUtils.clamp(nv,1,9);
+  if(nv===S.tap) return;
+  tapFrom = S.tap; S.tap = nv; S.tapAnim = 1;
+  $('tap-val').textContent = nv;
+  toast(`有载分接开关动作：${tapFrom} 档 → ${nv} 档（触头切换，过渡电阻限流）`);
+}
+$('tap-inc').addEventListener('click',()=>oltcTo(S.tap+1));
+$('tap-dec').addEventListener('click',()=>oltcTo(S.tap-1));
+function nTapTo(nv){
+  nv = THREE.MathUtils.clamp(nv,1,3);
+  if(!S.tripped && S.load>5){ toast('⚠ 无载分接开关须在停电状态下调节！'); return; }
+  S.nTap = nv; $('ntap-val').textContent = nv;
+  toast(`无载分接开关 → ${nv} 档（变比已改变）`);
+}
+$('ntap-inc').addEventListener('click',()=>nTapTo(S.nTap+1));
+$('ntap-dec').addEventListener('click',()=>nTapTo(S.nTap-1));
+
+/* ---------- 时间控制（播放/暂停/快进/复位） ---------- */
+$('tb-play').addEventListener('click',()=>{ S.paused=false;
+  $('tb-play').classList.add('on'); $('tb-pause').classList.remove('on'); });
+$('tb-pause').addEventListener('click',()=>{ S.paused=true;
+  $('tb-pause').classList.add('on'); $('tb-play').classList.remove('on'); toast('仿真已暂停'); });
+$('tb-ff').addEventListener('click',()=>{ setSlider('tspeed', Math.min(10, S.tspeed*2)); });
+$('tb-reset').addEventListener('click',()=>resetSystem());
+
+/* ---------- 工具条 ---------- */
+document.querySelectorAll('.tbtn').forEach(b=>{
+  b.addEventListener('click',()=>{
+    const t = b.dataset.t;
+    if(t==='clip') toggleClip();
+    else if(t==='explode') toggleExplode();
+    else if(t==='reset') resetSystem();
+    else if(t==='select'){ b.classList.add('on'); }
+    else setView(t);
+    if(t!=='clip'&&t!=='explode'&&t!=='select') b.classList.remove('on');
+  });
+});
+function resetSystem(){
+  S.tripped=false; S.gasLight=false; S.gasHeavy=false; S.prvPop=false;
+  S.faultHeat=0; S._pendingTrip=0; S.paused=false;
+  S.tWind=55; S.tTop=45; S.oilLevel=62;
+  setSlider('load',60); setSlider('in-volt',CUR_SPEC.v1);
+  $('scenario').value='routine';
+  clearFaultMarks(); clearAlarms();
+  if(explodeTarget) toggleExplode();
+  pushAlarm('','系统已复位至日常常规工况');
+  toast('系统复位：日常常规运行（60%）');
+}
+
+/* ---------- 剖切控制接线 ---------- */
+$('clip-sw').addEventListener('click',()=>toggleClip());
+['x','y','z'].forEach(ax=>{
+  $('clip-'+ax).addEventListener('input',e=>{
+    clipPos[ax]=parseFloat(e.target.value);
+    $('clip-'+ax+'-v').textContent = clipPos[ax].toFixed(2);
+    if(clipOn) applyClip();
+  });
+});
+
+/* ---------- DGA 预设样本与自动诊断 ---------- */
+$('dga-preset').addEventListener('change', e=>{
+  setGases(DGA_PRESETS[e.target.value]); diagnose();
+});
+GASES.forEach(g=>{
+  // 手动修改任意气体浓度 → 防抖自动诊断
+  let tm=null;
+  $('gas-'+g).addEventListener('input',()=>{
+    clearTimeout(tm); tm=setTimeout(diagnose, 600);
+  });
+});
+
+/* ---------- 数据订阅 → UI 刷新（观察者模式） ---------- */
+store.subscribe('runtime', d=>{
+  $('s-uin').textContent = d.uIn.toFixed(1);
+  $('s-uout').textContent = d.uOut.toFixed(2);
+  $('s-iin').textContent = d.iIn.toFixed(1);
+  $('s-iout').textContent = d.iOut.toFixed(0);
+  $('s-freq').textContent = d.freq.toFixed(2);
+  $('s-beta').textContent = d.beta.toFixed(1);
+  setKV('s-twind', d.tWind.toFixed(1), d.tWind>105?'r':d.tWind>85?'a':'g');
+  setKV('s-ttop', d.tTop.toFixed(1), d.tTop>85?'r':d.tTop>55?'a':'g');
+  $('s-trise').textContent = d.tRise.toFixed(1);
+  $('s-tamb').textContent = d.tAmb.toFixed(1);
+  setKV('s-oilmm', d.oilMm.toFixed(0), d.oilLevel<25?'r':d.oilLevel<35?'a':'g');
+  // 保护装置状态灯
+  setProt('gas1', d.gasLight, '报警', '正常');
+  setProt('gas2', d.gasHeavy, '跳闸', '正常');
+  setProt('prv', d.prvPop, '动作', '正常');
+  setProt('oil', d.oilLevel<25, '偏低', '正常');
+  setProt('fan', d.fanOn, '运行中', '停止', true);
+  setProt('pump', d.pumpOn, '运行中', '停止', true);
+  setProt('flow', d.pumpOn, '油流正常', '自然循环', true);
+  setProt('walarm', d.tWind>105, '报警', '正常');
+  setProt('talarm', d.tTop>85, '报警', '正常');
+});
+function setKV(id,txt,cls){ const el=$(id); el.textContent=txt; el.className='v '+(cls||''); }
+function setProt(key, act, actTxt, idleTxt, actIsGood=false){
+  const row = document.querySelector(`.prot[data-p="${key}"]`);
+  if(!row) return;
+  row.querySelector('.st').textContent = act?actTxt:idleTxt;
+  row.querySelector('.st').className = 'st'+(act?' act':'');
+  const dot = row.querySelector('.dot');
+  dot.className = 'dot'+(act ? (actIsGood?'':' red') : '');
+}
+
+/* ---------- ☰ 菜单：隐藏/显示全部展示面板 ---------- */
+document.getElementById('menu-toggle').addEventListener('click', ()=>{
+  document.body.classList.toggle('ui-hidden');
+  toast(document.body.classList.contains('ui-hidden')
+    ? '面板已隐藏（点击 ☰ 恢复）' : '面板已恢复显示');
+});
+
+/* ---------- 顶部时钟 ---------- */
+setInterval(()=>{
+  $('clock').textContent = new Date().toLocaleString('zh-CN',{hour12:false});
+}, 1000);
+
+/* ---------- 实时曲线（60s 滚动窗口） ---------- */
+const curveCv = $('curve-cv');
+const curveBuf = [];
+let curveTimer = 0;
+function stepCurve(dt){
+  curveTimer += dt;
+  if(curveTimer<0.5) return;
+  curveTimer = 0;
+  const key = $('curve-sel').value;
+  const val = key==='tTop'?S.tTop : key==='tWind'?S.tWind : key==='v2'?S.v2 : (S.tripped?0:S.load);
+  curveBuf.push(val);
+  if(curveBuf.length>120) curveBuf.shift();
+  drawCurve();
+}
+function drawCurve(){
+  const dpr = devicePixelRatio||1;
+  const W = curveCv.clientWidth, H = curveCv.clientHeight;
+  curveCv.width = W*dpr; curveCv.height = H*dpr;
+  const c = curveCv.getContext('2d'); c.scale(dpr,dpr);
+  c.fillStyle='#06101f'; c.fillRect(0,0,W,H);
+  // 网格
+  c.strokeStyle='#12233d'; c.lineWidth=0.6;
+  for(let i=1;i<4;i++){ c.beginPath(); c.moveTo(0,H*i/4); c.lineTo(W,H*i/4); c.stroke(); }
+  if(curveBuf.length<2) return;
+  const mx = Math.max(...curveBuf)*1.15+1;
+  c.strokeStyle='#22e584'; c.lineWidth=1.6; c.beginPath();
+  curveBuf.forEach((v,i)=>{
+    const x = i/(119)*W, y = H-6-(v/mx)*(H-16);
+    i?c.lineTo(x,y):c.moveTo(x,y);
+  });
+  c.stroke();
+  c.fillStyle='#22e584'; c.font='10px Consolas';
+  c.fillText(curveBuf[curveBuf.length-1].toFixed(1), W-42, 12);
+  c.fillStyle='#3d5a7d';
+  c.fillText('-60s', 4, H-2); c.fillText('0s', W-18, H-2);
+}
+
+/* ---------- 性能保底：低帧率自动降级 ---------- */
+let fpsAcc=0, fpsN=0, degraded=false;
+function stepPerf(rawDt){
+  fpsAcc += rawDt; fpsN++;
+  if(fpsAcc>=3){
+    const fps = fpsN/fpsAcc; fpsAcc=0; fpsN=0;
+    if(!degraded && fps<30){
+      degraded = true;
+      renderer.setPixelRatio(1);
+      renderer.shadowMap.enabled = false;
+      flowGeo.setDrawRange(0, 300);   // 粒子数 900→300
+      pushAlarm('warn','检测到低帧率，已自动降级：粒子减少 / 阴影关闭（保底30fps）');
+      toast('性能保底：已自动降低粒子数量与材质复杂度');
+    }
+  }
+}
+
+/* ---------- 主循环 ---------- */
+const clock = new THREE.Clock();
+function loop(){
+  requestAnimationFrame(loop);
+  const rawDt = Math.min(clock.getDelta(), 0.05);
+  const dt = rawDt * S.tspeed;
+  const t = clock.elapsedTime;
+
+  stepPhysics(dt);
+  stepDataLayer(rawDt);
+  stepCurve(rawDt);
+  stepFlow(dt);
+  stepEM(dt, t);
+  stepExplode(rawDt);
+  stepView(rawDt);
+  stepFaultMarkers(t);
+  stepPerf(rawDt);
+
+  if(S.fanOn) fans.forEach(f=>f.rotation.z += dt*18);
+  else fans.forEach(f=>f.rotation.z += dt*0.5);
+
+  updateHover();   // 每帧刷新射线检测，确保移出后高亮即时清除
+  if(hoverObj){
+    const info = PART_INFO[hoverObj.userData.key];
+    const st = tooltip.querySelector('.tt-state');
+    if(info&&st) st.textContent = info.state();
+  }
+  // 超温视觉闪烁告警
+  key.intensity = (S.tTop>85) ? 2.2+0.6*Math.sin(t*8) : 2.2;
+
+  controls.update();
+  renderer.render(scene, camera);
+  if(window.TransformerSim) window.TransformerSim.frames++;
+}
+loop();
+drawDuval(null);
+
+addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  drawDuval(lastDuval);
+});
+
+// 初始：额定工况 + 正常色谱样本（自动诊断一次）
+setGases(DGA_PRESETS.normal);
+diagnose();
+toast('系统就绪：默认模拟数据源，悬浮零件查看信息');
+
+/* ---------- 对外 API（扩展与调试入口） ---------- */
+window.TransformerSim = {
+  S, scene, camera, renderer, controls, PART_INFO, pickables, FAULT_PARTS, explodables, store,
+  diagnose, setGases, markFault, clearFaultMarks, applyScenario, setView, resetSystem,
+  toggleClip, toggleExplode, duvalCalc, ratioEx, FAULT_TABLE, DGA_PRESETS,
+  SimulatedProvider, ExternalProvider,
+  get explodeT(){ return explodeT; }, get clipOn(){ return clipOn; },
+  frames: 0
+};
+
+</script>
+</body>
+</html>
