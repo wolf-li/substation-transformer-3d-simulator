@@ -6,7 +6,7 @@
 
 A Three.js-based high-fidelity 3D interactive simulation and DGA (Dissolved Gas Analysis) intelligent diagnosis system for substation transformers. Single-file app — no build step, runs directly in the browser.
 
-**Live demo**: `https://<your-username>.github.io/<repo>/`
+[Live demo](https://wolf-li.github.io/substation-transformer-3d-simulator/)
 
 ## Features
 

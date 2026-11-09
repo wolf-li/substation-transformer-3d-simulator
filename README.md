@@ -6,7 +6,7 @@
 
 基于 Three.js 的变压器高精度 3D 交互仿真与油色谱（DGA）智能诊断系统。单文件应用，无需构建，浏览器直接运行。
 
-**在线演示**：`https://<your-username>.github.io/<repo>/`
+[在线演示](https://wolf-li.github.io/substation-transformer-3d-simulator/)
 
 ### 功能特性
 
